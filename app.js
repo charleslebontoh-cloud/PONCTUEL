@@ -120,7 +120,7 @@ function dirFromOsrm(s) {
 const ABIDJAN = [5.3364, -4.0267];
 const OFM = 'https://tiles.openfreemap.org/styles/';
 const nightNow = () => S.set.mapStyle === 'night' || (S.set.mapStyle === 'auto' && (matchMedia('(prefers-color-scheme: dark)').matches || new Date().getHours() >= 19 || new Date().getHours() < 6));
-const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+const nasaDay = new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10); // J-2 : image toujours disponible
 const rasterStyle = (tiles, opts = {}) => ({
   version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: Object.fromEntries(tiles.map((t, i) => ['r' + i, { type: 'raster', tiles: [t.url], tileSize: 256, maxzoom: t.maxzoom || 19, attribution: t.attr || '' }])),
@@ -133,8 +133,15 @@ const SAT_TILES = [
 ];
 async function styleFor(kind) {
   if (kind === 'sat') return rasterStyle(SAT_TILES);
-  if (kind === 'nasa') return rasterStyle([{ url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${yesterday}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`, maxzoom: 9, attr: 'NASA EOSDIS GIBS' }, SAT_TILES[2]]);
   const night = nightNow();
+  if (kind === 'nasa') { // carte normale + nuages/météo NASA en transparence
+    const st = await styleFor('plan');
+    st.sources.nasa = { type: 'raster', tileSize: 256, maxzoom: 9, attribution: 'NASA EOSDIS GIBS (MODIS)',
+      tiles: [`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${nasaDay}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`] };
+    const i = st.layers.findIndex(l => l.type === 'symbol');
+    st.layers.splice(i < 0 ? st.layers.length : i, 0, { id: 'nasa', type: 'raster', source: 'nasa', paint: { 'raster-opacity': .55 } });
+    return st;
+  }
   try { return await getJSON(OFM + (night ? 'dark' : 'liberty'), 8000); }
   catch (e) {
     console.warn('OpenFreeMap indisponible, carte de secours', e);
@@ -161,7 +168,7 @@ $('#bLayer').onclick = () => {
   S.base = BASES[(BASES.indexOf(S.base) + 1) % 3];
   $('#bLayer').textContent = BASE_LBL[S.base];
   applyBase();
-  if (S.base === 'nasa') toast('NASA GIBS : image satellite d’hier (MODIS, 250 m/pixel). Utile pour la météo et les nuages, pas pour voir les voitures.', 6000);
+  if (S.base === 'nasa') { toast('Météo NASA : nuages et pluie vus par satellite (MODIS), en transparence sur la carte. Dézoomez pour voir la région.', 6000); if (!S.nav) { S.follow = false; map.easeTo({ zoom: Math.min(map.getZoom(), 8), pitch: 0, duration: 1200 }); } }
   if (S.base === 'sat') toast('Satellite haute résolution. Activez le trafic pour superposer les bouchons en direct.');
 };
 
@@ -187,7 +194,7 @@ function addOverlays() {
   }
   for (const id of ['heat', 'alts', 'done', 'jams']) map.addSource(id, { type: 'geojson', data: data[id] });
   map.addSource('main', { type: 'geojson', data: data.main, lineMetrics: true });
-  map.addLayer({ id: 'heat', type: 'circle', source: 'heat', paint: { 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 10, 4, 16, 90], 'circle-color': ['case', ['<', ['get', 'sp'], 10], '#ff4b4b', '#ff9a2e'], 'circle-opacity': .35, 'circle-blur': .6 } });
+  map.addLayer({ id: 'heat', type: 'circle', source: 'heat', paint: { 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 10, 3, 15, 30, 18, 110], 'circle-color': ['case', ['<', ['get', 'sp'], 10], '#ff4b4b', '#ff9a2e'], 'circle-opacity': .35, 'circle-blur': .6 } });
   map.addLayer({ id: 'alts', type: 'line', source: 'alts', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': getCss('--alt'), 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 17, 11], 'line-opacity': .7 } });
   map.addLayer({ id: 'main-glow', type: 'line', source: 'main', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': getCss('--route-2'), 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 12, 17, 30], 'line-opacity': .35, 'line-blur': 10 } });
   map.addLayer({ id: 'main-case', type: 'line', source: 'main', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#06223f', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 17, 17] } });
@@ -885,7 +892,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 6 · carte 3D, véhicule calé sur la route</p>
+  <p class="empty" style="font-size:12px">Version 7 · météo NASA en transparence</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
