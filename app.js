@@ -53,39 +53,44 @@ const getCss = v => getComputedStyle(document.documentElement).getPropertyValue(
 /* ================= État ================= */
 const S = {
   set: Object.assign({ key: '', buffer: 10, voice: true, track: true, tolls: false, highways: false, autoSat: true, reroute: true,
-    vehicle: 'car3d', vcolor: '#f7f7f7', three: true, mapStyle: 'auto' }, store.get('settings', {})),
+    vehicle: 'kaiyi', vcolor: '#f7f7f7', three: true, mapStyle: 'auto' }, store.get('settings', {})),
   places: store.get('places', []), trips: store.get('trips', []), cells: store.get('cells', {}),
   A: null, B: null, routes: [], sel: 0, satIdx: 0, destJam: null,
   pos: null, heading: null, devHeading: null, speed: 0,
   nav: null, base: 'plan', traffic: false, heat: false, follow: false, compassMode: 'north', updatedAt: null, cam: { z: 16, pitch: 50 }
 };
 const saveSet = () => store.set('settings', S.set);
-if (!S.set.v3d) { if (S.set.vehicle === 'car') { S.set.vehicle = 'car3d'; if (S.set.vcolor === '#2f7bff') S.set.vcolor = '#f7f7f7'; } S.set.v3d = 1; saveSet(); }
+if (!S.set.v3d) { if (S.set.vehicle === 'car') { S.set.vehicle = 'kaiyi'; if (S.set.vcolor === '#2f7bff') S.set.vcolor = '#f7f7f7'; } S.set.v3d = 1; saveSet(); }
+if (S.set.v3d < 2) { if (S.set.vehicle === 'car3d') S.set.vehicle = 'kaiyi'; S.set.v3d = 2; saveSet(); } // la Kaiyi X7 remplace la berline par défaut
 const savePlaces = () => store.set('places', S.places);
 
 /* ================= Icônes de véhicule ================= */
-const VEHICLES = { car3d: 'Berline 3D', arrow: 'Flèche', car: 'Berline', suv: '4x4', taxi: 'Taxi', moto: 'Moto', bus: 'Gbaka', truck: 'Camion', puck: 'Point' };
+const VEHICLES = { kaiyi: 'Kaiyi X7', car3d: 'Berline 3D', arrow: 'Flèche', car: 'Berline', suv: '4x4', taxi: 'Taxi', moto: 'Moto', bus: 'Gbaka', truck: 'Camion', puck: 'Point' };
 // Rendu 3D réaliste (généré pour Ponctuel), recoloré en direct sur canvas
-const CAR3D_URL = 'https://cdn.creativeclaw.co/u/79610596/images/4fcd3f87-0a02-42ab-83aa-d46c5647b590.png';
-let car3dImg = null, car3dReadable = false; const car3dWaiters = [];
-function loadCar3d(cb) {
-  if (car3dImg?.complete && car3dImg.naturalWidth) return cb(car3dImg);
-  car3dWaiters.push(cb); if (car3dImg) return;
+const REAL_CARS = {
+  kaiyi: 'https://cdn.creativeclaw.co/u/79610596/images/fa572658-0920-4b88-a52e-00e63c535c73.png', // SUV Kaiyi X7, vue de dessus
+  car3d: 'https://cdn.creativeclaw.co/u/79610596/images/4fcd3f87-0a02-42ab-83aa-d46c5647b590.png'
+};
+const realCache = {};
+function loadReal(type, cb) {
+  const c = realCache[type] ||= { img: null, readable: false, waiters: [], started: false };
+  if (c.img?.complete && c.img.naturalWidth) return cb(c);
+  c.waiters.push(cb); if (c.started) return; c.started = true;
   const tryLoad = cors => { const im = new Image(); if (cors) im.crossOrigin = 'anonymous';
-    im.onload = () => { car3dImg = im; car3dReadable = cors; car3dWaiters.splice(0).forEach(f => f(im)); };
-    im.onerror = () => { if (cors) tryLoad(false); else { car3dImg = null; car3dWaiters.splice(0).forEach(f => f(null)); } };
-    im.src = CAR3D_URL; car3dImg = im; };
+    im.onload = () => { c.img = im; c.readable = cors; c.waiters.splice(0).forEach(f => f(c)); };
+    im.onerror = () => { if (cors) tryLoad(false); else { c.img = null; c.started = false; c.waiters.splice(0).forEach(f => f(c)); } };
+    im.src = REAL_CARS[type]; };
   tryLoad(true);
 }
 const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
-function drawCar3d(cv, col) {
+function drawCar3d(cv, col, type = 'car3d') {
   const size = cv.width, ctx = cv.getContext('2d');
-  loadCar3d(im => {
+  loadReal(type, c => { const im = c.img;
     ctx.clearRect(0, 0, size, size);
-    if (!im) { const f = new Image(); f.onload = () => ctx.drawImage(f, 0, 0, size, size); f.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(vehicleSVG('car', col)); return; }
+    if (!im) { const f = new Image(); f.onload = () => ctx.drawImage(f, 0, 0, size, size); f.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(vehicleSVG(type === 'kaiyi' ? 'suv' : 'car', col)); return; }
     ctx.drawImage(im, 0, 0, size, size);
     const white = col.toLowerCase() === '#f7f7f7';
-    if (car3dReadable) { // détourage net + peinture recolorée (vitres et feux conservés)
+    if (c.readable) { // détourage net + peinture recolorée (vitres et feux conservés)
       try {
         const d = ctx.getImageData(0, 0, size, size), p = d.data, [tr, tg, tb] = hexRgb(col);
         for (let i = 0; i < p.length; i += 4) {
@@ -97,13 +102,13 @@ function drawCar3d(cv, col) {
             p[i] = Math.min(255, tr * k * 1.05 + 255 * Math.pow(l, 40) * .6); p[i + 1] = Math.min(255, tg * k * 1.05 + 255 * Math.pow(l, 40) * .6); p[i + 2] = Math.min(255, tb * k * 1.05 + 255 * Math.pow(l, 40) * .6); }
         }
         ctx.putImageData(d, 0, 0); return;
-      } catch { car3dReadable = false; }
+      } catch { c.readable = false; }
     }
     if (!white) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = col.toLowerCase() === '#1a1d24' ? '#4a505a' : col; ctx.fillRect(0, 0, size, size);
       ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(im, 0, 0, size, size); ctx.globalCompositeOperation = 'source-over'; }
   });
 }
-function car3dCanvas(col, css) { const c = document.createElement('canvas'); c.width = c.height = 256; c.className = 'car3d'; c.style.cssText = css || ''; drawCar3d(c, col); return c; }
+function car3dCanvas(col, css, type = 'car3d') { const c = document.createElement('canvas'); c.width = c.height = 256; c.className = 'car3d'; c.style.cssText = css || ''; drawCar3d(c, col, type); return c; }
 const COLORS = ['#2f7bff', '#ff3b3b', '#f7f7f7', '#1a1d24', '#f7941d', '#22c55e', '#8b5cf6', '#ffd400'];
 function shade(hex, f) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * f)))); return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); }
 function vehicleSVG(type, col) {
@@ -293,7 +298,7 @@ function meLook() {
   const nav = !!S.nav, v = nav ? S.set.vehicle : 'puck-idle';
   if (meMode === v + S.set.vcolor) return; meMode = v + S.set.vcolor;
   if (!nav) { meEl.className = 'puck'; meEl.innerHTML = '<div class="beam" id="beam"></div><i></i>'; }
-  else if (S.set.vehicle === 'car3d') { meEl.className = 'veh v3d'; meEl.innerHTML = ''; meEl.appendChild(car3dCanvas(S.set.vcolor)); }
+  else if (REAL_CARS[S.set.vehicle]) { meEl.className = 'veh v3d'; meEl.innerHTML = ''; meEl.appendChild(car3dCanvas(S.set.vcolor, '', S.set.vehicle)); }
   else { meEl.className = 'veh'; meEl.innerHTML = vehicleSVG(S.set.vehicle, S.set.vcolor); }
 }
 // Interpolation fluide entre deux points GPS
@@ -920,7 +925,7 @@ function statsHtml() {
 function settingsHtml() {
   const s = S.set;
   return `<h3 style="margin-top:4px">Mon véhicule sur la carte</h3>
-  <div class="vgrid">${Object.entries(VEHICLES).map(([k, n]) => `<button class="vopt ${s.vehicle === k ? 'on' : ''}" data-veh="${k}">${k === 'car3d' ? '<span class="c3slot"></span>' : vehicleSVG(k, s.vcolor)}${n}</button>`).join('')}</div>
+  <div class="vgrid">${Object.entries(VEHICLES).map(([k, n]) => `<button class="vopt ${s.vehicle === k ? 'on' : ''}" data-veh="${k}">${REAL_CARS[k] ? `<span class="c3slot" data-t="${k}"></span>` : vehicleSVG(k, s.vcolor)}${n}</button>`).join('')}</div>
   <div class="swatches">${COLORS.map(c => `<button class="sw ${s.vcolor === c ? 'on' : ''}" data-col="${c}" style="background:${c}" aria-label="Couleur ${c}"></button>`).join('')}</div>
   <h3>Style de carte</h3>
   <div class="seg">${[['auto', 'Auto jour/nuit'], ['day', 'Jour'], ['night', 'Nuit']].map(([k, n]) => `<button data-ms="${k}" class="${s.mapStyle === k ? 'on' : ''}">${n}</button>`).join('')}</div>
@@ -933,7 +938,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 8 · véhicule Berline 3D réaliste</p>
+  <p class="empty" style="font-size:12px">Version 9 · véhicule Kaiyi X7</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -948,7 +953,7 @@ function bindPane() {
     S.places.push({ id: 'p' + Date.now().toString(36), lat: b.lat, lng: b.lng, name: b.name, tag: '', visits: 0, hours: Array(24).fill(0), dows: Array(7).fill(0), mins: 0, last: 0 });
     savePlaces(); renderPlaces(); toast('Lieu mémorisé.');
   });
-  pane.querySelectorAll('.c3slot').forEach(sl => sl.replaceWith(car3dCanvas(S.set.vcolor, 'width:44px;height:44px')));
+  pane.querySelectorAll('.c3slot').forEach(sl => sl.replaceWith(car3dCanvas(S.set.vcolor, 'width:48px;height:48px', sl.dataset.t)));
   pane.querySelectorAll('[data-veh]').forEach(b => b.onclick = () => { S.set.vehicle = b.dataset.veh; saveSet(); meMode = ''; meLook(); render(); toast(`Véhicule : ${VEHICLES[S.set.vehicle]}. Il apparaît pendant le guidage.`); });
   pane.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { S.set.vcolor = b.dataset.col; saveSet(); meMode = ''; meLook(); render(); });
   pane.querySelectorAll('[data-ms]').forEach(b => b.onclick = () => { S.set.mapStyle = b.dataset.ms; saveSet(); render(); if (S.base === 'plan') applyBase(); });
