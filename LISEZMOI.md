@@ -7,4 +7,4 @@ Le GPS du téléphone ne fonctionne que sur une adresse https. Voici le plus sim
 3. Sur le téléphone, ouvrez cette adresse dans Chrome, puis menu ⋮ → « Ajouter à l'écran d'accueil ».
 4. Dans Ponctuel → Réglages, collez votre clé TomTom gratuite (https://developer.tomtom.com) pour le trafic en direct.
 
-En ligne : https://charleslebontoh-cloud.github.io/ponctuel/
+En ligne : https://charleslebontoh-cloud.github.io/PONCTUEL/
