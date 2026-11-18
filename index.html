@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Ponctuel</title>
+<meta name="theme-color" content="#0d1521">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Concept : écran de bord de nuit. Carte plein écran, une seule couleur signal (ambre « horloge ») pour le temps, rouge/orange réservés au trafic. */
+:root{
+  --ink:#0d1521; --panel:#141f2e; --panel-2:#1b2a3d; --line:#2a3b52;
+  --text:#e9eef5; --muted:#93a4ba;
+  --signal:#ffb21e; --signal-ink:#1d1300;
+  --go:#2fd27a; --slow:#ff9a2e; --jam:#ff4b4b; --route:#4aa3ff; --alt:#7d8ea6;
+  --display:"Archivo",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --r:14px; --shadow:0 10px 30px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --ink:#eef2f7; --panel:#ffffff; --panel-2:#f1f4f9; --line:#d6dee9;
+  --text:#0d1521; --muted:#56657a; --signal:#e08a00; --signal-ink:#fff;
+  --route:#1f6fe0; --alt:#8a98ab; --shadow:0 10px 30px rgba(20,35,60,.18); color-scheme:light}}
+:root[data-theme="light"]{
+  --ink:#eef2f7; --panel:#ffffff; --panel-2:#f1f4f9; --line:#d6dee9;
+  --text:#0d1521; --muted:#56657a; --signal:#e08a00; --signal-ink:#fff;
+  --route:#1f6fe0; --alt:#8a98ab; --shadow:0 10px 30px rgba(20,35,60,.18); color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--text);font:15px/1.4 var(--body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+#map{position:fixed;inset:0;z-index:0;background:var(--ink)}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums;font-stretch:88%}
+
+/* ---- Barre de recherche ---- */
+#top{position:fixed;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);
+  left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));
+  max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:10px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 8px}
+.brand h1{margin:0;font:800 19px/1 var(--display);font-stretch:112%;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.brand h1 i{width:18px;height:18px;border-radius:50%;border:3px solid var(--signal);position:relative;display:inline-block}
+.brand h1 i::after{content:"";position:absolute;left:5px;top:1px;width:2px;height:6px;background:var(--signal);transform-origin:bottom;border-radius:2px}
+.clock{font:700 15px var(--display);color:var(--signal)}
+.fields{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.field{position:relative;display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:0 10px;min-width:0}
+.field b{font:800 12px var(--display);width:20px;height:20px;border-radius:6px;display:grid;place-items:center;flex:none}
+.field.a b{background:var(--route);color:#fff}.field.b b{background:var(--signal);color:var(--signal-ink)}
+.field input{border:0;background:transparent;outline:none;padding:11px 0;width:100%;min-width:0}
+#swap{grid-row:1/3;grid-column:2;height:100%;width:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-size:18px}
+.row2{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:7px 12px;font-size:13px;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.chip.on{border-color:var(--signal);color:var(--signal)}
+.arrive{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 12px;font-size:13px}
+.arrive input{background:transparent;border:0;outline:none;width:108px;font:700 14px var(--display);color:var(--signal)}
+#go{margin-left:auto;background:var(--signal);color:var(--signal-ink);border:0;border-radius:999px;padding:8px 18px;font:800 14px var(--display);letter-spacing:.03em}
+#suggest{position:absolute;left:10px;right:10px;top:100%;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;max-height:50vh;overflow-y:auto}
+#suggest button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:transparent}
+#suggest button small{display:block;color:var(--muted)}
+#suggest button:hover,#suggest button:focus{background:var(--panel-2)}
+#hint{margin-top:8px;font-size:13px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#hint .chip{font-size:12px;padding:5px 10px}
+
+/* ---- Boutons flottants ---- */
+#fab{position:fixed;z-index:450;right:max(10px,env(safe-area-inset-right,0px));bottom:calc(var(--sheet-h,140px) + 14px);display:flex;flex-direction:column;gap:8px;transition:bottom .25s}
+#fab button{width:46px;height:46px;border-radius:12px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);display:grid;place-items:center;font:800 12px var(--display);position:relative}
+#fab button.on{border-color:var(--signal);color:var(--signal)}
+#fab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- Feuille du bas ---- */
+#sheet{position:fixed;z-index:480;left:0;right:0;bottom:0;max-height:62vh;background:var(--panel);border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.35);
+  padding:6px max(14px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(14px,env(safe-area-inset-left,0px));overflow-y:auto;max-width:640px;margin:0 auto}
+#sheet .grab{width:40px;height:4px;border-radius:4px;background:var(--line);margin:4px auto 10px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:8px 10px;border-radius:8px;color:var(--muted);font:700 13px var(--display);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.tabs button.on{background:var(--panel-2);color:var(--text)}
+.empty{color:var(--muted);font-size:14px;padding:6px 2px 4px}
+.empty strong{color:var(--text)}
+h3{font:800 13px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+
+/* Planificateur d'arrivée */
+.plan{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
+.plan .big{grid-row:1/3;font:900 40px/1 var(--display);font-stretch:80%;color:var(--signal);font-variant-numeric:tabular-nums}
+.plan .big small{font-size:14px;font-stretch:100%;margin-left:2px}
+.plan .l1{font-weight:700}
+.plan .l2{color:var(--muted);font-size:13px}
+.plan.late .big{color:var(--jam)}
+.plan.ok .big{color:var(--go)}
+
+/* Cartes d'itinéraires */
+.route{display:grid;grid-template-columns:6px 1fr auto;gap:0 12px;border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 12px 0;margin-bottom:8px;background:transparent;width:100%;text-align:left;overflow:hidden}
+.route .stripe{grid-row:1/4;border-radius:0 4px 4px 0;background:var(--alt)}
+.route.sel{border-color:var(--route);background:var(--panel-2)}
+.route.sel .stripe{background:var(--route)}
+.route .t{font:800 26px/1 var(--display);font-stretch:85%;font-variant-numeric:tabular-nums}
+.route .t small{font-size:14px;font-weight:600}
+.route .eta{text-align:right;font:700 15px var(--display);color:var(--signal)}
+.route .meta{color:var(--muted);font-size:13px;margin-top:4px;grid-column:2/4}
+.route .bar{grid-column:2/4;height:6px;border-radius:6px;margin-top:8px;background:var(--go);display:flex;overflow:hidden}
+.badge{display:inline-block;font:800 11px var(--display);letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:6px;margin-right:4px;vertical-align:2px}
+.badge.best{background:var(--go);color:#062312}.badge.jam{background:var(--jam);color:#fff}.badge.slow{background:var(--slow);color:#2a1600}
+.jam-item{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:transparent;border-radius:12px;padding:10px;margin-bottom:6px}
+.jam-item i{width:10px;height:36px;border-radius:4px;flex:none;background:var(--jam)}
+.jam-item i.mod{background:var(--slow)}
+.jam-item div{min-width:0;flex:1}
+.jam-item small{color:var(--muted);display:block}
+.jam-item span{font:700 12px var(--display);color:var(--signal);white-space:nowrap}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:10px 14px;font-weight:700}
+.btn.primary{background:var(--signal);color:var(--signal-ink);border-color:transparent;font-family:var(--display);font-weight:800;letter-spacing:.03em}
+.btn.wide{width:100%}
+.btn.danger{color:var(--jam)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* Lieux */
+.place{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.place .ic{width:34px;height:34px;border-radius:10px;background:var(--panel-2);display:grid;place-items:center;font:800 13px var(--display);flex:none;color:var(--signal)}
+.place div{flex:1;min-width:0}
+.place b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.place small{color:var(--muted)}
+.place .act{display:flex;gap:4px}
+.place .act button{border:1px solid var(--line);background:transparent;border-radius:8px;padding:6px 8px;font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--panel-2);border-radius:12px;padding:10px}
+.stat b{display:block;font:800 24px var(--display);font-stretch:85%;font-variant-numeric:tabular-nums}
+.stat small{color:var(--muted);font-size:12px}
+.hours{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:46px;margin-top:6px}
+.hours i{background:var(--signal);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
+.hours-l{display:flex;justify-content:space-between;color:var(--muted);font-size:11px}
+
+/* Réglages */
+label.set{display:block;margin:10px 0}
+label.set span{display:block;font-weight:700;margin-bottom:4px}
+label.set small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+label.set input[type=text],label.set input[type=number],label.set input[type=password]{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.toggle input{width:20px;height:20px;accent-color:var(--signal)}
+.note{background:var(--panel-2);border-left:3px solid var(--signal);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin:10px 0}
+.note b{color:var(--text)}
+.note a{color:var(--signal)}
+
+/* ---- Vue satellite du bouchon ---- */
+#sat{position:fixed;z-index:700;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(10px,env(safe-area-inset-right,0px));width:min(380px,calc(100vw - 20px));
+  background:var(--panel);border:2px solid var(--jam);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+#sat header{display:flex;align-items:flex-start;gap:8px;padding:10px 12px}
+#sat header div{flex:1;min-width:0}
+#sat header b{display:block;font:800 15px var(--display)}
+#sat header small{color:var(--muted)}
+#sat .live{display:inline-flex;align-items:center;gap:5px;font:800 11px var(--display);letter-spacing:.06em;color:var(--jam);text-transform:uppercase}
+#sat .live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--jam);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+#satmap{height:240px;background:#000}
+@media (max-height:760px){#satmap{height:180px}}
+#sat footer{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;align-items:center}
+#sat footer .btn{padding:7px 10px;font-size:13px}
+#sat footer a{color:var(--signal);font-size:13px;margin-left:auto}
+#sat .x{border:0;background:var(--panel-2);border-radius:8px;width:30px;height:30px;font-size:16px}
+#sat .cap{font-size:11px;color:var(--muted);padding:0 12px 8px}
+
+/* ---- Navigation ---- */
+#nav{position:fixed;z-index:600;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 10px) max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px))}
+#nav .instr{background:var(--route);color:#fff;border-radius:var(--r);padding:14px 16px;display:flex;gap:14px;align-items:center;box-shadow:var(--shadow);max-width:560px}
+#nav .instr .d{font:900 30px/1 var(--display);font-stretch:85%;white-space:nowrap}
+#nav .instr .m{font-weight:700;font-size:17px;min-width:0}
+#nav .warn{margin-top:8px;max-width:560px;background:var(--jam);color:#fff;border-radius:12px;padding:10px 14px;font-weight:700;box-shadow:var(--shadow)}
+#navbar{position:fixed;z-index:600;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);
+  padding:12px max(14px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(14px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:14px}
+#navbar .k{flex:1;display:flex;gap:18px;flex-wrap:wrap}
+#navbar .k div b{display:block;font:800 22px/1.1 var(--display);font-stretch:85%;font-variant-numeric:tabular-nums}
+#navbar .k div small{color:var(--muted);font-size:12px}
+#navbar .eta b{color:var(--signal)}
+#navbar .eta.late b{color:var(--jam)}
+#speed{position:fixed;z-index:600;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 96px);width:64px;height:64px;border-radius:50%;background:var(--panel);border:3px solid var(--line);display:grid;place-items:center;text-align:center;box-shadow:var(--shadow)}
+#speed b{font:900 24px/1 var(--display);display:block}
+#speed small{font-size:10px;color:var(--muted)}
+
+#toast{position:fixed;z-index:900;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);background:var(--text);color:var(--ink);padding:10px 16px;border-radius:12px;font-weight:700;max-width:calc(100vw - 32px);box-shadow:var(--shadow)}
+
+/* Marqueurs */
+.me{width:22px;height:22px;border-radius:50%;background:var(--route);border:3px solid #fff;box-shadow:0 0 0 6px rgba(74,163,255,.25)}
+.me.nav{width:0;height:0;border-radius:0;background:none;border:0;box-shadow:none;position:relative}
+.me.nav::after{content:"";position:absolute;left:-14px;top:-16px;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:32px solid var(--route);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.pin{font:800 12px var(--display);width:26px;height:26px;border-radius:8px 8px 8px 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.pin span{transform:rotate(45deg)}
+.pin.a{background:var(--route);color:#fff}.pin.b{background:var(--signal);color:var(--signal-ink)}
+.jampin{width:26px;height:26px;border-radius:50%;background:var(--jam);border:2px solid #fff;color:#fff;display:grid;place-items:center;font:900 14px var(--display);box-shadow:0 0 0 0 rgba(255,75,75,.6);animation:ring 1.6s infinite}
+@keyframes ring{70%{box-shadow:0 0 0 14px rgba(255,75,75,0)}100%{box-shadow:0 0 0 0 rgba(255,75,75,0)}}
+.placepin{width:14px;height:14px;border-radius:4px;background:var(--signal);border:2px solid var(--ink);transform:rotate(45deg)}
+.leaflet-container{font-family:var(--body)}
+.leaflet-control-attribution{font-size:10px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (min-width:900px){#sheet{left:12px;right:auto;width:480px;bottom:12px;border-radius:18px;border:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:480px}}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Carte"></div>
+
+<section id="top">
+  <div class="brand"><h1><i></i>Ponctuel</h1><span class="clock num" id="clock">--:--</span></div>
+  <div class="fields">
+    <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
+    <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser">⇅</button>
+    <label class="field b"><b>B</b><input id="inB" placeholder="Où allez-vous ?" autocomplete="off" aria-label="Destination"></label>
+  </div>
+  <div id="suggest" hidden></div>
+  <div class="row2">
+    <label class="arrive" title="Heure à laquelle vous devez être arrivé">Arriver à <input type="time" id="arriveAt"></label>
+    <button class="chip" id="chipHome" hidden>Maison</button>
+    <button class="chip" id="chipWork" hidden>Travail</button>
+    <button id="go">Y aller</button>
+  </div>
+  <div id="hint" hidden></div>
+</section>
+
+<div id="fab">
+  <button id="bLocate" title="Me localiser" aria-label="Me localiser"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
+  <button id="bLayer" title="Changer de fond de carte" aria-label="Fond de carte">PLAN</button>
+  <button id="bTraffic" title="Trafic en direct" aria-label="Trafic en direct"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="7" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="17" r="1.5"/></svg></button>
+  <button id="bHeat" title="Mes zones lentes apprises" aria-label="Zones lentes apprises"><svg viewBox="0 0 24 24"><path d="M12 22c4-3 7-6.5 7-11a7 7 0 0 0-14 0c0 4.5 3 8 7 11z"/><circle cx="12" cy="11" r="2.5"/></svg></button>
+</div>
+
+<section id="sheet" aria-label="Panneau">
+  <div class="grab"></div>
+  <nav class="tabs" role="tablist">
+    <button data-tab="trip" class="on">Trajet</button>
+    <button data-tab="places">Mes lieux</button>
+    <button data-tab="stats">Ponctualité</button>
+    <button data-tab="settings">Réglages</button>
+  </nav>
+  <div id="pane"></div>
+</section>
+
+<section id="sat" hidden aria-live="polite">
+  <header>
+    <div><span class="live">Bouchon détecté</span><b id="satTitle">—</b><small id="satSub"></small></div>
+    <button class="x" id="satClose" aria-label="Fermer la vue satellite">✕</button>
+  </header>
+  <div id="satmap"></div>
+  <div class="cap" id="satCap">Vue satellite haute résolution + trafic en direct superposé.</div>
+  <footer>
+    <button class="btn" id="satPrev">◀</button><span class="num" id="satIdx">1/1</span><button class="btn" id="satNext">▶</button>
+    <button class="btn" id="satZoom">Zoom</button>
+    <a id="satEarth" href="#" target="_blank" rel="noopener">Google Earth 3D ↗</a>
+  </footer>
+</section>
+
+<div id="nav" hidden>
+  <div class="instr"><div class="d num" id="nDist">—</div><div class="m" id="nMsg">Calcul…</div></div>
+  <div class="warn" id="nWarn" hidden></div>
+</div>
+<div id="speed" hidden><div><b id="spd">0</b><small>km/h</small></div></div>
+<div id="navbar" hidden>
+  <div class="k">
+    <div class="eta" id="nEtaBox"><b id="nEta">--:--</b><small>arrivée</small></div>
+    <div><b id="nLeft">--</b><small>restant</small></div>
+    <div><b id="nKm">--</b><small>km</small></div>
+  </div>
+  <button class="btn" id="nMute" aria-label="Couper la voix">🔊</button>
+  <button class="btn danger" id="nStop">Arrêter</button>
+</div>
+<div id="toast" hidden></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
