@@ -42,13 +42,49 @@ const fmtKm = m => m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixe
 const CARD = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 const cardinal = h => CARD[Math.round(((h % 360) + 360) % 360 / 45) % 8];
 let toastT;
-function toast(msg, ms = 3500) { const t = $('#toast'); t.textContent = msg; t.hidden = false; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+function toast(msg, ms = 3500, icon) { const t = $('#toast'); t.innerHTML = (icon && typeof ic === 'function' ? ic(icon) : '') + '<span></span>'; t.lastChild.textContent = msg; t.hidden = false; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
 async function getJSON(url, ms = 12000) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
   finally { clearTimeout(t); }
 }
 const getCss = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+/* Jeu d'icônes unique (trait 2 px, coins arrondis) */
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  swap: '<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>',
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  cube: '<path d="m12 2 9 5v10l-9 5-9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+  traffic: '<rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="7" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="17" r="1.4"/>',
+  flame: '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-5 8-1-1-2-2-2-4-1.5 2-2 4-2 6 0 5 3 9 7 9z"/>',
+  locate: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>', chevL: '<path d="m15 6-6 6 6 6"/>', chevR: '<path d="m9 6 6 6-6 6"/>',
+  vol: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>',
+  mute: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  police: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/>',
+  crash: '<path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/><path d="M3 4l3 3M21 4l-3 3M12 2v3"/>',
+  closed: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  flood: '<path d="M2 17c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M2 21c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M12 3v9M8 8l4 4 4-4"/>',
+  jam: '<path d="M5 13l2-5h10l2 5v5H5z"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/><path d="M5 13h14"/>',
+  route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H17a3.5 3.5 0 0 0 0-7H7a3.5 3.5 0 0 1 0-7h8.5"/>',
+  pin: '<path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+  stats: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  check: '<path d="m5 12 5 5L20 7"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  go: '<path d="M12 2l7 19-7-4-7 4z"/>', flag: '<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
+  recent: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+function injectIcons(root = document) { root.querySelectorAll('[data-ic]').forEach(el => { const st = el.getAttribute('style'); el.outerHTML = ic(el.dataset.ic).replace('<svg ', `<svg ${st ? `style="${st}" ` : ''}`); }); }
+injectIcons();
 
 /* ================= État ================= */
 const S = {
@@ -214,10 +250,18 @@ const map = new maplibregl.Map({
 });
 map.touchZoomRotate.enableRotation();
 map.on('moveend', () => { const c = map.getCenter(); store.set('view', [c.lat, c.lng]); store.set('zoom', map.getZoom()); });
+function syncTheme() {
+  const dark = S.base !== 'plan' || nightNow();
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#0b1220' : '#e9eef5');
+}
 async function applyBase() {
+  syncTheme();
   const st = await styleFor(S.base);
   map.setStyle(st, { diff: false });
 }
+const hideSplash = () => { const sp = $('#splash'); if (sp && !sp.classList.contains('out')) { sp.classList.add('out'); setTimeout(() => sp.remove(), 600); } };
+map.once('idle', hideSplash); setTimeout(hideSplash, 2200);
 applyBase();
 map.on('style.load', () => { addOverlays(); atmosphere(); });
 function atmosphere() {
@@ -226,10 +270,10 @@ function atmosphere() {
   try { map.setSky?.({ 'sky-color': night ? '#0a1426' : '#8ec5ff', 'horizon-color': night ? '#1d3358' : '#dcecff', 'fog-color': night ? '#0b1220' : '#eef4fb', 'sky-horizon-blend': .6, 'horizon-fog-blend': .7, 'fog-ground-blend': .4 }); } catch { }
 }
 
-const BASES = ['plan', 'sat', 'nasa'], BASE_LBL = { plan: 'PLAN', sat: 'SAT', nasa: 'NASA' };
+const BASES = ['plan', 'sat', 'nasa'], BASE_LBL = { plan: 'Plan', sat: 'Sat', nasa: 'Météo' };
 $('#bLayer').onclick = () => {
   S.base = BASES[(BASES.indexOf(S.base) + 1) % 3];
-  $('#bLayer').textContent = BASE_LBL[S.base];
+  $('#bLayerLbl').textContent = BASE_LBL[S.base];
   applyBase();
   if (S.base === 'nasa') { toast('Météo NASA : nuages et pluie vus par satellite (MODIS), en transparence sur la carte. Dézoomez pour voir la région.', 6000); if (!S.nav) { S.follow = false; map.easeTo({ zoom: Math.min(map.getZoom(), 8), pitch: 0, duration: 1200 }); } }
   if (S.base === 'sat') toast('Satellite haute résolution. Activez le trafic pour superposer les bouchons en direct.');
@@ -304,7 +348,7 @@ setInterval(() => { // trafic rafraîchi toutes les 2 min
 }, 120000);
 
 /* ---- 3D / 2D ---- */
-function refresh3D() { $('#b3d').textContent = S.set.three ? '3D' : '2D'; $('#b3d').classList.toggle('on', S.set.three); }
+function refresh3D() { $('#b3dLbl').textContent = S.set.three ? '3D' : '2D'; $('#b3d').classList.toggle('on', S.set.three); }
 $('#b3d').onclick = () => { S.set.three = !S.set.three; saveSet(); refresh3D(); set3DBuildings(S.set.three); const pt = S.set.three ? (S.nav ? 62 : 50) : 0; if (S.follow) S.cam.pitch = pt; else map.easeTo({ pitch: pt, duration: 800 }); };
 refresh3D();
 
@@ -532,7 +576,20 @@ function bindSearch(inp, which) {
 bindSearch($('#inA'), 'A'); bindSearch($('#inB'), 'B');
 document.addEventListener('click', e => { if (!e.target.closest('#suggest,.field')) $('#suggest').hidden = true; });
 function setA(p) { S.A = p; $('#inA').value = p.name; drawPins(); }
-function setB(p) { S.B = p; $('#inB').value = p.name; $('#hint').hidden = true; drawPins(); }
+function setB(p) { S.B = p; $('#inB').value = p.name; $('#hint').hidden = true; drawPins(); addRecent(p); }
+let recents = store.get('recents', []);
+function addRecent(p) {
+  if (!p?.name || /^Point sur la carte$/.test(p.name)) return;
+  recents = [{ lat: p.lat, lng: p.lng, name: p.name }, ...recents.filter(r => hav([r.lat, r.lng], [p.lat, p.lng]) > 80)].slice(0, 8);
+  store.set('recents', recents); renderRecents();
+}
+function renderRecents() {
+  const box = $('#recents'); if (!box) return;
+  const list = recents.filter(r => !S.B || hav([r.lat, r.lng], [S.B.lat, S.B.lng]) > 80).slice(0, 6);
+  box.hidden = !list.length || !!S.routes.length;
+  box.innerHTML = list.map((r, i) => `<button class="chip" data-rc="${i}">${ic('recent')}<span>${esc(r.name)}</span></button>`).join('');
+  box.querySelectorAll('[data-rc]').forEach(b => b.onclick = () => { const r = list[+b.dataset.rc]; setB(r); calc(); });
+}
 $('#swap').onclick = () => {
   const a = S.A || (S.pos ? { lat: S.pos[0], lng: S.pos[1], name: 'Ma position' } : null), b = S.B;
   S.A = b; S.B = a; $('#inA').value = b?.name || ''; $('#inB').value = a?.name || ''; drawPins(); if (S.B) calc();
@@ -558,7 +615,7 @@ async function calc(opts = {}) {
   const a = opts.from || origin(), b = S.B;
   if (!b) { toast('Choisissez une destination.'); $('#inB').focus(); return; }
   if (!a) { startGeo(); toast('En attente du GPS… ou saisissez un point de départ.'); waitPosThen(calc); return; }
-  if (!opts.silent) { showTab('trip'); $('#pane').innerHTML = '<p class="empty">Calcul des itinéraires et analyse du trafic…</p>'; }
+  if (!opts.silent) { showTab('trip'); $('#pane').innerHTML = '<p class="empty">Calcul des itinéraires et analyse du trafic…</p><div class="skel"></div><div class="skel" style="opacity:.6"></div><div class="skel" style="opacity:.35"></div>'; }
   let routes;
   try { routes = S.set.key ? await tomtomRoutes(a, b) : await osrmRoutes(a, b); }
   catch (e) {
@@ -784,7 +841,7 @@ async function startNav() {
   startGeo();
   S.nav = { r, start: Date.now(), planned: targetDate()?.getTime() || null, spoken: {}, off: 0, lastCheck: Date.now(), done: 0, idx: 0 };
   S.compassMode = 'heading'; meMode = ''; meLook(); refreshCompass();
-  for (const id of ['#top', '#sheet', '#sat']) $(id).hidden = true;
+  for (const id of ['#top', '#sheet', '#sat']) $(id).hidden = true; $('#bReport').hidden = false; muteIcon();
   $('#nav').hidden = false; $('#navbar').hidden = false; $('#speed').hidden = false;
   $('#fab').style.bottom = 'calc(env(safe-area-inset-bottom,0px) + 110px)'; setData('alts', EMPTY); setTimeout(syncSheet, 50);
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { }
@@ -799,19 +856,20 @@ function stopNav(arrived) {
     const end = Date.now(), lateMin = n.planned ? Math.round((end - n.planned) / 60000) : null;
     S.trips.unshift({ start: n.start, end, toName: S.B?.name || '', planned: n.planned, lateMin, dist: Math.round(n.done) });
     S.trips = S.trips.slice(0, 300); store.set('trips', S.trips);
-    if (arrived) speak(lateMin == null ? 'Vous êtes arrivé.' : lateMin <= 0 ? `Vous êtes arrivé, avec ${-lateMin} minutes d'avance.` : `Vous êtes arrivé, avec ${lateMin} minutes de retard.`);
+    if (arrived) { speak(lateMin == null ? 'Vous êtes arrivé.' : lateMin <= 0 ? `Vous êtes arrivé, avec ${-lateMin} minutes d'avance.` : `Vous êtes arrivé, avec ${lateMin} minutes de retard.`); setTimeout(() => showArrival(S.trips[0]), 400); }
   }
   S.nav = null; store.set('cells', S.cells); S.compassMode = 'north'; S.follow = false;
   try { wakeLock?.release(); } catch { } wakeLock = null;
   for (const id of ['#top', '#sheet']) $(id).hidden = false;
-  for (const id of ['#nav', '#navbar', '#speed', '#recenter']) $(id).hidden = true;
+  for (const id of ['#nav', '#navbar', '#speed', '#recenter', '#bReport', '#reportSheet']) $(id).hidden = true;
   $('#fab').style.bottom = '';
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
   map.easeTo({ bearing: 0, pitch: S.set.three ? 45 : 0, duration: 800 });
   meMode = ''; meLook(); refreshCompass(); setData('done', EMPTY); drawRoutes(false); render(); if (orbisOk && S.base === 'plan') applyBase();
 }
 $('#nStop').onclick = () => stopNav(false);
-$('#nMute').onclick = () => { S.set.voice = !S.set.voice; saveSet(); $('#nMute').textContent = S.set.voice ? '🔊' : '🔇'; };
+const muteIcon = () => $('#nMute').innerHTML = ic(S.set.voice ? 'vol' : 'mute');
+$('#nMute').onclick = () => { S.set.voice = !S.set.voice; saveSet(); muteIcon(); toast(S.set.voice ? 'Guidage vocal activé' : 'Guidage vocal coupé', 2000, S.set.voice ? 'vol' : 'mute'); };
 function navUpdate() {
   const n = S.nav, r = n.r, p = S.pos;
   let best = n.idx, bd = Infinity, bt = 0;
@@ -834,7 +892,7 @@ function navUpdate() {
   const idxNext = r.steps.findIndex(s => s.off > done + 5), st = r.steps[idxNext], nx = r.steps[idxNext + 1];
   if (st) {
     const d = st.off - done;
-    $('#nDist').textContent = fmtKm(d); $('#nMsg').textContent = st.text; $('#nIcon').innerHTML = manSvg(st.dir);
+    $('#nDist').textContent = fmtKm(d); $('#nMsg').textContent = st.text; if ($('#nIcon').dataset.d !== st.dir) { $('#nIcon').innerHTML = manSvg(st.dir); $('#nIcon').dataset.d = st.dir; } $('#nav .instr').classList.toggle('near', d < 120);
     const th = $('#nThen'); if (nx && nx.off - st.off < 400) { th.hidden = false; th.innerHTML = `Puis ${manSvg(nx.dir)} ${esc(nx.text)}`; } else th.hidden = true;
     if (d < 450 && d > 150 && !n.spoken[st.off + 'f']) { n.spoken[st.off + 'f'] = 1; speak(`Dans ${Math.round(d / 50) * 50} mètres, ${lc(st.text)}`); }
     if (d <= 70 && !n.spoken[st.off + 'n']) { n.spoken[st.off + 'n'] = 1; speak(st.text); navigator.vibrate?.(60); }
@@ -887,7 +945,7 @@ function syncSheet() {
 function render() {
   const pane = $('#pane');
   pane.innerHTML = curTab === 'trip' ? tripHtml() : curTab === 'places' ? placesHtml() : curTab === 'stats' ? statsHtml() : settingsHtml();
-  bindPane(); requestAnimationFrame(syncSheet);
+  bindPane(); requestAnimationFrame(syncSheet); if (typeof renderRecents === 'function') renderRecents();
 }
 function tripHtml() {
   if (!S.routes.length) return `<p class="empty"><strong>Saisissez une destination</strong> (ou appui long sur la carte). Indiquez l’heure à laquelle vous devez arriver : Ponctuel vous dira quand partir et par où passer pour éviter les bouchons.</p>` +
@@ -911,18 +969,18 @@ function tripHtml() {
       <div class="bar">${segs}</div></button>`;
   }).join('');
   const jl = satList();
-  const jams = jl.length ? `<h3>Points noirs · vue satellite</h3>` + jl.map((j, i) => `<button class="jam-item" data-j="${i}"><i class="${j.mag >= 3 ? '' : 'mod'}"></i><div><b>${j.dest ? 'Autour de la destination' : j.mag >= 3 ? 'Bouchon' : 'Ralentissement'}${j.src === 'perso' ? ' (habituel)' : ''}</b><small>${[j.speed != null ? Math.round(j.speed) + ' km/h' : '', j.delay ? '+' + fmtDur(j.delay) : '', j.startOff != null && !j.dest ? 'à ' + fmtKm(j.startOff) : ''].filter(Boolean).join(' · ')}</small></div><span>Voir ›</span></button>`).join('') : '';
+  const jams = jl.length ? `<h3>Points noirs · vue satellite</h3>` + jl.map((j, i) => `<button class="jam-item" data-j="${i}"><i class="${j.mag >= 3 ? '' : 'mod'}"></i><div><b>${j.dest ? 'Autour de la destination' : j.mag >= 3 ? 'Bouchon' : 'Ralentissement'}${j.src === 'perso' ? ' (habituel)' : ''}</b><small>${[j.speed != null ? Math.round(j.speed) + ' km/h' : '', j.delay ? '+' + fmtDur(j.delay) : '', j.startOff != null && !j.dest ? 'à ' + fmtKm(j.startOff) : ''].filter(Boolean).join(' · ')}</small></div><span>Voir ${ic('chevR')}</span></button>`).join('') : '';
   return plan + cards + `<div class="btns"><button class="btn primary wide" id="startNav">Démarrer le guidage</button></div>` +
     `<p class="empty" style="font-size:12px;text-align:center">${S.routes[0].live ? 'Trafic en direct' : 'Estimation'} · actualisé à ${fmtTime(S.updatedAt || new Date())}</p>` + jams +
-    (S.B ? `<div class="btns"><button class="btn" id="saveB">★ Mémoriser « ${esc(S.B.name).slice(0, 28)} »</button></div>` : '');
+    (S.B ? `<div class="btns"><button class="btn" id="saveB">${ic('star')}Mémoriser « ${esc(S.B.name).slice(0, 28)} »</button></div>` : '');
 }
 function placesHtml() {
   if (!S.places.length) return `<p class="empty"><strong>Aucun lieu mémorisé pour l’instant.</strong> Avec le suivi activé, chaque endroit où vous restez plus de 5 minutes est enregistré avec vos horaires. Vous pouvez aussi mémoriser une destination depuis l’onglet Trajet.</p>`;
   const tagL = { home: 'Maison', work: 'Travail' };
   return S.places.slice().sort((a, b) => b.visits - a.visits).map(p => {
     const top = p.hours.indexOf(Math.max(...p.hours));
-    return `<div class="place"><span class="ic">${p.tag === 'home' ? 'M' : p.tag === 'work' ? 'T' : p.visits}</span><div><b>${esc(p.name)}</b><small>${tagL[p.tag] ? tagL[p.tag] + ' · ' : ''}${p.visits} visite${p.visits > 1 ? 's' : ''}${p.visits ? ' · surtout vers ' + top + ' h' : ''}${p.mins ? ' · ' + fmtDur(p.mins * 60) + ' au total' : ''}</small></div>
-      <div class="act"><button data-pgo="${p.id}">Y aller</button><button data-pedit="${p.id}" aria-label="Modifier">✎</button></div></div>
+    return `<div class="place"><span class="pic">${p.tag === 'home' ? ic('home') : p.tag === 'work' ? ic('work') : p.visits}</span><div><b>${esc(p.name)}</b><small>${tagL[p.tag] ? tagL[p.tag] + ' · ' : ''}${p.visits} visite${p.visits > 1 ? 's' : ''}${p.visits ? ' · surtout vers ' + top + ' h' : ''}${p.mins ? ' · ' + fmtDur(p.mins * 60) + ' au total' : ''}</small></div>
+      <div class="act"><button data-pgo="${p.id}">${ic('go')}Y aller</button><button data-pedit="${p.id}" aria-label="Modifier">${ic('edit')}</button></div></div>
       <div id="e_${p.id}" hidden><label class="set"><span>Nom</span><input type="text" value="${esc(p.name)}" data-pname="${p.id}"></label>
       <div class="btns"><button class="btn" data-ptag="${p.id}|home">Maison</button><button class="btn" data-ptag="${p.id}|work">Travail</button><button class="btn" data-ptag="${p.id}|">Aucun</button><button class="btn danger" data-pdel="${p.id}">Supprimer</button></div></div>`;
   }).join('');
@@ -939,7 +997,7 @@ function statsHtml() {
   <div class="note"><b>Conseil.</b> ${tip}</div>
   <h3>Quand vous roulez au pas (vos données)</h3>
   <div class="hours">${hours.map(h => `<i style="height:${Math.round(h / mx * 100)}%"></i>`).join('')}</div><div class="hours-l"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>23 h</span></div>
-  <h3>Derniers trajets</h3>` + (S.trips.length ? S.trips.slice(0, 12).map(t => `<div class="place"><span class="ic" style="color:var(${t.lateMin > 0 ? '--jam' : '--go'})">${t.lateMin == null ? '·' : t.lateMin > 0 ? '+' + t.lateMin : '✓'}</span><div><b>${esc(t.toName || 'Trajet')}</b><small>${new Date(t.start).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${fmtTime(new Date(t.start))} → ${fmtTime(new Date(t.end))} · ${fmtKm(t.dist)}</small></div></div>`).join('') : '<p class="empty">Aucun trajet guidé pour l’instant.</p>');
+  <h3>Derniers trajets</h3>` + (S.trips.length ? S.trips.slice(0, 12).map(t => `<div class="place"><span class="pic" style="color:var(${t.lateMin > 0 ? '--jam' : '--go'})">${t.lateMin == null ? '·' : t.lateMin > 0 ? '+' + t.lateMin : '✓'}</span><div><b>${esc(t.toName || 'Trajet')}</b><small>${new Date(t.start).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${fmtTime(new Date(t.start))} → ${fmtTime(new Date(t.end))} · ${fmtKm(t.dist)}</small></div></div>`).join('') : '<p class="empty">Aucun trajet guidé pour l’instant.</p>');
 }
 function settingsHtml() {
   const s = S.set;
@@ -960,7 +1018,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 10 · carte TomTom 3D</p>
+  <p class="empty" style="font-size:12px">Version 11 · design premium</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1035,3 +1093,102 @@ setInterval(predict, 300000);
 S.wasNight = nightNow();
 setInterval(() => { if (S.base === 'plan' && S.set.mapStyle === 'auto' && !S.nav) { const n = nightNow(); if (n !== S.wasNight) { S.wasNight = n; applyBase(); } } }, 600000);
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { voiceFr = null; };
+
+
+/* ================= Passe premium : effets, signalements, partage, arrivée ================= */
+// Onde au toucher + petite vibration (Android)
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('button,.btn,.chip,.ctl'); if (!b || reduceMotion) return;
+  const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2, sp = document.createElement('span');
+  sp.className = 'rip'; sp.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+  b.appendChild(sp); setTimeout(() => sp.remove(), 600); navigator.vibrate?.(6);
+}, { passive: true });
+
+// Panneau du bas : glisser vers le bas pour réduire, vers le haut pour agrandir
+(() => {
+  const g = $('#grab'); let y0 = null;
+  g.addEventListener('pointerdown', e => { y0 = e.clientY; g.setPointerCapture(e.pointerId); });
+  g.addEventListener('pointerup', e => {
+    if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
+    if (Math.abs(dy) < 8) return; // simple tap : géré par onclick
+    $('#sheet').classList.toggle('min', dy > 0); setTimeout(syncSheet, 320); g.dataset.skip = '1';
+  });
+  const oc = g.onclick; g.onclick = e => { if (g.dataset.skip) { delete g.dataset.skip; return; } oc?.(e); };
+})();
+
+// Partager mon heure d'arrivée
+$('#nShare').onclick = async () => {
+  const n = S.nav; if (!n) return;
+  const leftT = n.r.dur * ((n.r.dist - n.done) / n.r.dist), eta = fmtTime(new Date(Date.now() + leftT * 1000));
+  const text = `Je suis en route vers ${S.B?.name || 'ma destination'}. Arrivée prévue à ${eta} (encore ${fmtDur(leftT)}). — Ponctuel`;
+  try { if (navigator.share) { await navigator.share({ title: 'Mon heure d’arrivée', text }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('Message copié : collez-le dans WhatsApp ou SMS.', 3500, 'share'); } catch { toast(text, 7000); }
+};
+
+// Signalements (gardés sur le téléphone, rappelés quand on repasse à proximité)
+const REPORTS = {
+  jam: { n: 'Bouchon', c: '#ff4b4b', ttl: 2 }, crash: { n: 'Accident', c: '#ff6a2e', ttl: 3 }, police: { n: 'Police', c: '#3d7bff', ttl: 2 },
+  alert: { n: 'Danger', c: '#f0a000', ttl: 24 * 7 }, closed: { n: 'Route fermée', c: '#8b5cf6', ttl: 24 }, flood: { n: 'Inondation', c: '#0ea5e9', ttl: 12 }
+};
+let reports = store.get('reports', []).filter(r => Date.now() - r.t < REPORTS[r.k]?.ttl * 3600e3);
+let reportMarkers = [];
+function renderReports() {
+  reportMarkers.forEach(m => m.remove()); reportMarkers = [];
+  reports.forEach(r => {
+    const T = REPORTS[r.k]; if (!T) return;
+    const el = document.createElement('div'); el.className = 'rpin'; el.style.background = T.c; el.innerHTML = ic(r.k);
+    el.title = `${T.n} · signalé à ${fmtTime(new Date(r.t))}`;
+    el.onclick = ev => { ev.stopPropagation(); toast(`${T.n} signalé à ${fmtTime(new Date(r.t))}`, 3000, r.k); };
+    reportMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([r.lng, r.lat]).addTo(map));
+  });
+}
+$('#rGrid').innerHTML = Object.entries(REPORTS).map(([k, T]) => `<button class="ropt" data-rk="${k}" style="background:linear-gradient(150deg,${T.c},${shade(T.c, .7)})">${ic(k)}${T.n}</button>`).join('');
+$('#bReport').onclick = () => { $('#reportSheet').hidden = false; };
+$('#rClose').onclick = () => { $('#reportSheet').hidden = true; };
+$('#rGrid').querySelectorAll('[data-rk]').forEach(b => b.onclick = () => {
+  const p = anim.cur || S.pos; if (!p) { toast('Position GPS indisponible.'); return; }
+  const k = b.dataset.rk; reports.push({ k, lat: p[0], lng: p[1], t: Date.now() }); store.set('reports', reports);
+  renderReports(); $('#reportSheet').hidden = true; toast(`${REPORTS[k].n} signalé. Merci !`, 2500, 'check'); navigator.vibrate?.([20, 40, 20]);
+});
+const warnedReports = new Set();
+setInterval(() => { // alerte vocale à l'approche d'un signalement (≤ 400 m, devant soi)
+  if (!S.nav || !S.pos) return;
+  for (const r of reports) {
+    const d = hav(S.pos, [r.lat, r.lng]), id = r.t + r.k;
+    if (d < 400 && d > 30 && !warnedReports.has(id)) {
+      const ahead = S.heading == null || Math.abs(angDiff(S.heading, bearingOf(S.pos, [r.lat, r.lng]))) < 60;
+      if (ahead) { warnedReports.add(id); speak(`Attention, ${REPORTS[r.k].n.toLowerCase()} signalé à ${Math.round(d / 50) * 50} mètres.`); toast(`${REPORTS[r.k].n} à ${fmtKm(d)}`, 4000, r.k); }
+    }
+  }
+}, 3000);
+renderReports();
+
+// Écran d'arrivée + confettis si à l'heure
+function showArrival(t) {
+  if (!t) return;
+  const ok = t.lateMin == null || t.lateMin <= 0, mins = Math.max(1, Math.round((t.end - t.start) / 60000));
+  const box = $('#arrival');
+  box.innerHTML = `<div class="badge-big ${ok ? '' : 'late'}">${ic(ok ? 'check' : 'clock')}</div>
+    <h2>${ok ? 'Bien arrivé !' : 'Arrivé'}</h2>
+    <p>${esc(t.toName || 'Destination')} · ${fmtTime(new Date(t.end))}</p>
+    <div class="stats"><div class="stat"><b>${t.lateMin == null ? '—' : t.lateMin <= 0 ? '−' + (-t.lateMin) : '+' + t.lateMin}</b><small>${t.lateMin == null ? 'pas d’heure fixée' : t.lateMin <= 0 ? 'min d’avance' : 'min de retard'}</small></div>
+      <div class="stat"><b>${mins}</b><small>min de trajet</small></div><div class="stat"><b>${(t.dist / 1000).toFixed(1).replace('.', ',')}</b><small>km</small></div></div>
+    <button class="btn primary wide" id="arrOk">${ic('check')}Terminer</button>`;
+  box.hidden = false; $('#arrOk').onclick = () => { box.hidden = true; };
+  if (ok && !reduceMotion) confetti();
+}
+function confetti() {
+  const cv = $('#confetti'), ctx = cv.getContext('2d'); cv.hidden = false;
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; ctx.scale(devicePixelRatio, devicePixelRatio);
+  const cols = ['#ffb21e', '#3d9bff', '#40e0ff', '#2fd27a', '#ff4b4b', '#ffffff'];
+  const ps = Array.from({ length: 140 }, () => ({ x: innerWidth / 2, y: innerHeight * .45, vx: (Math.random() - .5) * 12, vy: -Math.random() * 14 - 4, r: Math.random() * 6 + 3, c: cols[Math.random() * cols.length | 0], a: Math.random() * 6, va: (Math.random() - .5) * .3 }));
+  const t0 = performance.now();
+  const step = now => {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    ps.forEach(p => { p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c; ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); ctx.restore(); });
+    if (now - t0 < 2600) requestAnimationFrame(step); else { ctx.clearRect(0, 0, innerWidth, innerHeight); cv.hidden = true; ctx.setTransform(1, 0, 0, 1, 0, 0); }
+  };
+  requestAnimationFrame(step);
+}
+renderRecents(); syncTheme();
+$('#sheet').addEventListener('transitionend', syncSheet); // recale les boutons une fois le panneau stabilisé

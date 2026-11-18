@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
 /* Concept : cockpit de nuit. Carte vectorielle 3D plein écran, panneaux en verre dépoli,
    une seule couleur signal (ambre « horloge ») pour le temps, rouge/orange réservés au trafic, bleu électrique pour la route. */
@@ -21,7 +21,7 @@
   --text:#eef3fa; --muted:#93a4ba;
   --signal:#ffb21e; --signal-ink:#1d1300;
   --go:#2fd27a; --slow:#ff9a2e; --jam:#ff4b4b; --route:#3d9bff; --route-2:#40e0ff; --alt:#8193ad;
-  --display:"Archivo",system-ui,sans-serif; --body:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --display:"Sora","Plus Jakarta Sans",system-ui,sans-serif; --body:"Plus Jakarta Sans",system-ui,sans-serif;
   --r:16px; --shadow:0 12px 34px rgba(0,0,0,.45); --blur:saturate(160%) blur(18px);
   color-scheme:dark;
 }
@@ -42,7 +42,7 @@ button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--signal);outline-offset:2px}
 #map{position:fixed;inset:0;z-index:0;background:var(--ink)}
-.num{font-family:var(--display);font-variant-numeric:tabular-nums;font-stretch:88%}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .glass{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--line);box-shadow:var(--shadow)}
 @keyframes rise{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
 @keyframes drop{from{transform:translateY(-14px);opacity:0}to{transform:none;opacity:1}}
@@ -144,7 +144,7 @@ h3{font:800 13px var(--display);letter-spacing:.06em;text-transform:uppercase;co
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 
 .place{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
-.place .ic{width:34px;height:34px;border-radius:10px;background:var(--glass-2);display:grid;place-items:center;font:800 13px var(--display);flex:none;color:var(--signal)}
+.place .pic{width:34px;height:34px;border-radius:10px;background:var(--glass-2);display:grid;place-items:center;font:800 13px var(--display);flex:none;color:var(--signal)}
 .place div{flex:1;min-width:0}
 .place b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .place small{color:var(--muted)}
@@ -241,51 +241,141 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
 .placepin{width:16px;height:16px;border-radius:5px;background:var(--signal);border:2px solid var(--ink);transform:rotate(45deg);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}
 .maplibregl-ctrl-attrib{font-size:10px}
 .maplibregl-ctrl-bottom-right{bottom:calc(var(--sheet-h,140px) - 4px)}
+
+/* ===== Passe premium : icônes, verre, lumière, animations ===== */
+.ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.glass{box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.03)}
+.brand h1{font:800 20px/1 var(--display);letter-spacing:-.02em}
+.brand .tag{font:600 11px var(--body);color:var(--muted);letter-spacing:.04em;margin-left:2px}
+.clock{font:700 15px var(--display);letter-spacing:-.01em;display:flex;align-items:center;gap:5px}
+.clock .ic{width:15px;height:15px}
+#swap{display:grid;place-items:center}
+#swap .ic{width:20px;height:20px}
+.field .ic{width:18px;height:18px;color:var(--muted)}
+.chip .ic{width:15px;height:15px}
+#go{display:flex;align-items:center;gap:6px;font-family:var(--display);letter-spacing:0}
+#go .ic{width:17px;height:17px;stroke-width:2.4}
+.ctl{flex-direction:column;gap:2px}
+.ctl small{font:700 9px var(--display);letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.ctl .ic{width:21px;height:21px}
+.ctl.on{box-shadow:var(--shadow),0 0 0 1px var(--signal) inset,0 0 18px rgba(255,178,30,.25)}
+.tabs button{display:flex;align-items:center;gap:6px;font:700 12px var(--display);letter-spacing:.01em;text-transform:none}
+.tabs button .ic{width:16px;height:16px}
+.tabs button.on{background:linear-gradient(135deg,rgba(61,155,255,.22),rgba(64,224,255,.12));color:var(--text);box-shadow:inset 0 0 0 1px rgba(61,155,255,.35)}
+h3{font:700 12px var(--display);letter-spacing:.08em}
+.route .t,.plan .big,.stat b,#navbar .k div b,#nav .d,#speed b{font-family:var(--display);font-stretch:normal;letter-spacing:-.03em}
+.route{transition:transform .15s,border-color .25s,background .25s,box-shadow .25s}
+.route.sel{box-shadow:0 10px 26px rgba(30,110,255,.22),inset 0 0 0 1px rgba(61,155,255,.4)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-family:var(--body);font-weight:700}
+.btn .ic{width:18px;height:18px}
+.btn.primary{position:relative;overflow:hidden}
+.btn.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-100%);animation:shine 3s ease-in-out infinite}
+.place .ic.lead{color:var(--signal)}
+.place .act button{display:inline-flex;align-items:center;gap:4px}
+.place .act .ic{width:15px;height:15px}
+/* effet d'onde au toucher */
+button,.btn,.chip,.ctl{position:relative;overflow:hidden}
+#compass{overflow:visible}
+.place .pic .ic{width:18px;height:18px}
+.rip{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.22;transform:scale(0);animation:rip .55s ease-out forwards}
+@keyframes rip{to{transform:scale(1);opacity:0}}
+/* écran de démarrage */
+#splash{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;align-content:center;gap:14px;background:radial-gradient(120% 80% at 50% 30%,#14304f 0%,#0b1220 60%);color:#fff;transition:opacity .5s,visibility .5s}
+#splash.out{opacity:0;visibility:hidden}
+#splash .logo{width:96px;height:96px;border-radius:28px;background:linear-gradient(145deg,#1b2b44,#0d1726);display:grid;place-items:center;box-shadow:0 20px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+#splash .logo svg{width:64px;height:64px}
+#splash .hand{transform-origin:32px 32px;animation:hand 1.2s cubic-bezier(.6,0,.2,1) infinite}
+#splash b{font:800 30px var(--display);letter-spacing:-.03em;animation:rise .6s .15s ease-out backwards}
+#splash small{font:600 13px var(--body);color:#9fb3cc;letter-spacing:.06em;animation:rise .6s .3s ease-out backwards}
+#splash .bar{width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:6px}
+#splash .bar i{display:block;height:100%;width:40%;background:linear-gradient(90deg,#3d9bff,#40e0ff);border-radius:3px;animation:load 1s ease-in-out infinite}
+@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+/* squelette de chargement */
+.skel{height:84px;border-radius:var(--r);margin-bottom:8px;background:linear-gradient(100deg,var(--glass-2) 30%,rgba(255,255,255,.08) 50%,var(--glass-2) 70%);background-size:300% 100%;animation:skel 1.2s linear infinite}
+@keyframes skel{from{background-position:100% 0}to{background-position:0 0}}
+/* navigation */
+#nav .instr{position:relative;overflow:hidden;transition:background .4s}
+#nav .instr::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);transform:translateX(-100%);animation:shine 4s ease-in-out infinite}
+#nav .instr.near{background:linear-gradient(135deg,#0c8a5a,#14b86f 60%,#2fd27a)}
+#nav .instr.near .man{animation:beat .8s ease-in-out infinite}
+@keyframes beat{50%{transform:scale(1.08)}}
+#nav .then .ic{width:16px;height:16px}
+#navbar .row .btn{padding:10px 12px}
+#bReport{position:fixed;z-index:600;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 196px);width:58px;height:58px;border-radius:50%;border:0;color:#1d1300;
+  background:radial-gradient(circle at 30% 25%,#ffd36b,#ffb21e 55%,#f08a00);box-shadow:0 10px 24px rgba(255,160,20,.45),inset 0 1px 0 rgba(255,255,255,.5);display:grid;place-items:center}
+#bReport .ic{width:26px;height:26px;stroke-width:2.4}
+.sheet2{position:fixed;z-index:950;left:0;right:0;bottom:0;border-radius:24px 24px 0 0;border-bottom:0;max-width:560px;margin:0 auto;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(16px,env(safe-area-inset-left,0px));animation:rise .35s cubic-bezier(.2,1.2,.4,1)}
+.sheet2 h2{margin:0 0 12px;font:800 20px var(--display);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between}
+.sheet2 .x{border:0;background:var(--glass-2);border-radius:10px;width:34px;height:34px;display:grid;place-items:center}
+.rgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ropt{border:0;border-radius:18px;padding:14px 6px 12px;display:grid;justify-items:center;gap:8px;font:700 12px var(--body);color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.25)}
+.ropt .ic{width:30px;height:30px;stroke-width:2.2}
+.rpin{width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 6px 14px rgba(0,0,0,.4);animation:pop .4s ease-out;cursor:pointer}
+.rpin .ic{transform:rotate(45deg);width:18px;height:18px;color:#fff;stroke-width:2.4}
+/* carte d'arrivée */
+#arrival{text-align:center}
+#arrival .badge-big{width:84px;height:84px;margin:4px auto 10px;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 30% 25%,#5df0a2,#18b866);box-shadow:0 14px 34px rgba(24,184,102,.45);animation:pop .5s cubic-bezier(.2,1.5,.4,1)}
+#arrival .badge-big.late{background:radial-gradient(circle at 30% 25%,#ffb36b,#ff6a2e);box-shadow:0 14px 34px rgba(255,106,46,.45)}
+#arrival .badge-big .ic{width:42px;height:42px;stroke-width:2.6}
+#arrival h2{justify-content:center;font-size:24px}
+#arrival p{color:var(--muted);margin:0 0 14px}
+#arrival .stats{margin-bottom:14px}
+#confetti{position:fixed;inset:0;z-index:960;pointer-events:none}
+.recents{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:8px;padding-bottom:2px}
+.recents .chip{font-size:12px;padding:6px 10px;max-width:180px}
+.recents .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast{display:flex;align-items:center;gap:8px;border-radius:14px;font-family:var(--body)}
+#toast .ic{width:18px;height:18px}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
 </head>
 <body>
+<div id="splash"><div class="logo"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="#ffb21e" stroke-width="6"/><path class="hand" d="M32 32V16" stroke="#ffb21e" stroke-width="5" stroke-linecap="round"/><path d="M32 32l11 7" stroke="#3d9bff" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="32" r="4" fill="#fff"/></svg></div><b>Ponctuel</b><small>ARRIVEZ À L’HEURE</small><div class="bar"><i></i></div></div>
 <div id="map" role="application" aria-label="Carte"></div>
 
 <section id="top" class="glass">
-  <div class="brand"><h1><i></i>Ponctuel</h1><span class="clock num" id="clock">--:--</span></div>
+  <div class="brand"><h1><i></i>Ponctuel</h1><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
   <div class="fields">
     <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
-    <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser">⇅</button>
+    <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser"><span data-ic="swap"></span></button>
     <label class="field b"><b>B</b><input id="inB" placeholder="Où allez-vous ?" autocomplete="off" aria-label="Destination"></label>
   </div>
   <div id="suggest" class="glass" hidden></div>
   <div class="row2">
-    <label class="arrive" title="Heure à laquelle vous devez être arrivé">Arriver à <input type="time" id="arriveAt"></label>
-    <button class="chip" id="chipHome" hidden>Maison</button>
-    <button class="chip" id="chipWork" hidden>Travail</button>
-    <button id="go">Y aller</button>
+    <label class="arrive" title="Heure à laquelle vous devez être arrivé"><span data-ic="flag" style="width:15px;height:15px;color:var(--signal)"></span>Arriver à <input type="time" id="arriveAt"></label>
+    <button class="chip" id="chipHome" hidden><span data-ic="home"></span>Maison</button>
+    <button class="chip" id="chipWork" hidden><span data-ic="work"></span>Travail</button>
+    <button id="go"><span data-ic="go"></span>Y aller</button>
   </div>
   <div id="hint" hidden></div>
+  <div class="recents" id="recents" hidden></div>
 </section>
 
 <div id="lstack">
   <button id="compass" class="ctl glass" title="Boussole : nord en haut ou cap en haut" aria-label="Boussole"><div class="dial" id="dial"><span class="n">N</span></div><small id="compassLbl">NORD</small></button>
-  <button class="ctl glass" id="bLayer" title="Changer de fond de carte" aria-label="Fond de carte">PLAN</button>
-  <button class="ctl glass" id="bHeat" title="Mes zones lentes apprises" aria-label="Zones lentes apprises"><svg viewBox="0 0 24 24"><path d="M12 22c4-3 7-6.5 7-11a7 7 0 0 0-14 0c0 4.5 3 8 7 11z"/><circle cx="12" cy="11" r="2.5"/></svg></button>
+  <button class="ctl glass" id="bLayer" title="Changer de fond de carte" aria-label="Fond de carte"><span data-ic="layers"></span><small id="bLayerLbl">Plan</small></button>
+  <button class="ctl glass" id="bHeat" title="Mes zones lentes apprises" aria-label="Zones lentes apprises"><span data-ic="flame"></span><small>Lent</small></button>
 </div>
 
 <div id="fab">
-  <button class="ctl glass" id="bLocate" title="Recentrer sur ma position" aria-label="Recentrer"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
-  <button class="ctl glass" id="b3d" title="Vue 2D / 3D" aria-label="Vue 3D">3D</button>
-  <button class="ctl glass" id="bTraffic" title="Trafic en direct" aria-label="Trafic en direct"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="7" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="17" r="1.5"/></svg></button>
+  <button class="ctl glass" id="bLocate" title="Recentrer sur ma position" aria-label="Recentrer"><span data-ic="locate"></span></button>
+  <button class="ctl glass" id="b3d" title="Vue 2D / 3D" aria-label="Vue 3D"><span data-ic="cube"></span><small id="b3dLbl">3D</small></button>
+  <button class="ctl glass" id="bTraffic" title="Trafic en direct" aria-label="Trafic en direct"><span data-ic="traffic"></span><small>Trafic</small></button>
 </div>
 
 <button id="recenter" hidden><svg viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></svg>Recentrer</button>
+<button id="bReport" hidden aria-label="Signaler un incident"><span data-ic="alert"></span></button>
 
 <section id="sheet" class="glass" aria-label="Panneau">
   <button class="grab" id="grab" aria-label="Réduire ou agrandir le panneau"></button>
   <nav class="tabs" role="tablist">
-    <button data-tab="trip" class="on">Trajet</button>
-    <button data-tab="places">Mes lieux</button>
-    <button data-tab="stats">Ponctualité</button>
-    <button data-tab="settings">Réglages</button>
+    <button data-tab="trip" class="on"><span data-ic="route"></span>Trajet</button>
+    <button data-tab="places"><span data-ic="pin"></span>Lieux</button>
+    <button data-tab="stats"><span data-ic="stats"></span>Ponctualité</button>
+    <button data-tab="settings"><span data-ic="sliders"></span>Réglages</button>
   </nav>
   <div id="pane"></div>
 </section>
@@ -293,14 +383,14 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
 <section id="sat" class="glass" hidden aria-live="polite">
   <header>
     <div><span class="live">Bouchon détecté</span><b id="satTitle">—</b><small id="satSub"></small></div>
-    <button class="x" id="satClose" aria-label="Fermer la vue satellite">✕</button>
+    <button class="x" id="satClose" aria-label="Fermer la vue satellite"><span data-ic="x"></span></button>
   </header>
   <div id="satmap"></div>
   <div class="cap" id="satCap">Vue satellite haute résolution + trafic en direct superposé.</div>
   <footer>
-    <button class="btn" id="satPrev" aria-label="Précédent">◀</button><span class="num" id="satIdx">1/1</span><button class="btn" id="satNext" aria-label="Suivant">▶</button>
-    <button class="btn" id="satZoom">Voir sur la carte</button>
-    <a id="satEarth" href="#" target="_blank" rel="noopener">Google Earth 3D ↗</a>
+    <button class="btn" id="satPrev" aria-label="Précédent"><span data-ic="chevL"></span></button><span class="num" id="satIdx">1/1</span><button class="btn" id="satNext" aria-label="Suivant"><span data-ic="chevR"></span></button>
+    <button class="btn" id="satZoom"><span data-ic="eye"></span>Carte</button>
+    <a id="satEarth" href="#" target="_blank" rel="noopener">Google Earth 3D</a>
   </footer>
 </section>
 
@@ -318,13 +408,21 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
       <div><b id="nLeft">--</b><small>restant</small></div>
       <div><b id="nKm">--</b><small>km</small></div>
     </div>
-    <button class="btn" id="nMute" aria-label="Couper la voix">🔊</button>
-    <button class="btn danger" id="nStop">Arrêter</button>
+    <button class="btn" id="nShare" aria-label="Partager mon heure d’arrivée"><span data-ic="share"></span></button>
+    <button class="btn" id="nMute" aria-label="Couper la voix"><span data-ic="vol"></span></button>
+    <button class="btn danger" id="nStop"><span data-ic="x"></span>Arrêter</button>
   </div>
 </div>
 <div id="toast" hidden></div>
+<section id="reportSheet" class="sheet2 glass" hidden aria-label="Signaler">
+  <h2>Signaler <button class="x" id="rClose" aria-label="Fermer"><span data-ic="x"></span></button></h2>
+  <div class="rgrid" id="rGrid"></div>
+  <p class="empty" style="font-size:12px;margin:12px 0 0">Vos signalements restent sur votre téléphone : Ponctuel vous prévient la prochaine fois que vous passez à proximité.</p>
+</section>
+<section id="arrival" class="sheet2 glass" hidden aria-label="Arrivée"></section>
+<canvas id="confetti" hidden></canvas>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
