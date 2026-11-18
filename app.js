@@ -317,9 +317,17 @@ $('#go').onclick = () => calc();
 
 async function tomtomRoutes(a, b) {
   const avoid = [S.set.tolls && 'tollRoads', S.set.highways && 'motorways'].filter(Boolean).map(x => '&avoid=' + x).join('');
-  const url = `https://api.tomtom.com/routing/1/calculateRoute/${a.lat},${a.lng}:${b.lat},${b.lng}/json?key=${encodeURIComponent(S.set.key)}` +
+  const q = `/${a.lat},${a.lng}:${b.lat},${b.lng}/json?key=${encodeURIComponent(S.set.key)}` +
     `&traffic=true&routeType=fastest&travelMode=car&maxAlternatives=2&departAt=now&computeTravelTimeFor=all&sectionType=traffic&instructionsType=text&language=fr-FR${avoid}`;
-  const j = await getJSON(url, 15000);
+  // API classique d'abord, puis la nouvelle plateforme Orbis (clés récentes MyTomTom)
+  let j;
+  const urls = S.set.orbis ? [`https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`, `https://api.tomtom.com/routing/1/calculateRoute${q}`]
+    : [`https://api.tomtom.com/routing/1/calculateRoute${q}`, `https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`];
+  for (const [i, u] of urls.entries()) {
+    try { j = await getJSON(u, 15000); if (j.routes?.length) { S.set.orbis = u.includes('/orbis/'); saveSet(); break; } }
+    catch (e) { if (i === urls.length - 1) throw e; }
+  }
+  if (!j?.routes) throw new Error('aucun itinéraire');
   return (j.routes || []).map(r => {
     const coords = r.legs.flatMap(l => l.points.map(p => [p.latitude, p.longitude]));
     const cum = cumDist(coords);
@@ -700,8 +708,13 @@ function bindPane() {
   $('#sSaveKey') && ($('#sSaveKey').onclick = async () => {
     S.set.key = $('#sKey').value.trim(); saveSet();
     if (!S.set.key) { setTraffic(false); toast('Clé retirée.'); return; }
-    try { const c = map.getCenter(); await getJSON(`https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${c.lat},${c.lng}&key=${encodeURIComponent(S.set.key)}`); toast('Clé valide : trafic en direct activé.'); setTraffic(true); }
-    catch (e) { toast(String(e.message).includes('403') || String(e.message).includes('401') ? 'Clé refusée par TomTom. Vérifiez-la.' : 'Clé enregistrée (test impossible ici : pas de route proche du centre de la carte).', 6000); }
+    // Test sur un vrai trajet court (Plateau → Cocody), API classique puis Orbis
+    const k = encodeURIComponent(S.set.key), q = `/5.3200,-4.0170:5.3480,-3.9900/json?key=${k}&traffic=true`;
+    const tries = [['classique', `https://api.tomtom.com/routing/1/calculateRoute${q}`], ['orbis', `https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`]];
+    let ok = null, lastErr = '';
+    for (const [name, u] of tries) { try { const j = await getJSON(u); if (j.routes?.length) { ok = name; break; } } catch (e) { lastErr = String(e.message); } }
+    if (ok) { S.set.orbis = ok === 'orbis'; saveSet(); toast(`Clé valide : trafic en direct activé (API ${ok}).`, 5000); setTraffic(true); }
+    else toast(/40[13]/.test(lastErr) ? 'Clé refusée par TomTom. Recopiez-la depuis MyTomTom → Keys, sans espace.' : 'Test impossible pour l’instant (réseau). La clé est enregistrée ; réessayez plus tard.', 7000);
   });
   $('#sExport') && ($('#sExport').onclick = () => {
     const blob = new Blob([JSON.stringify({ v: 1, places: S.places, trips: S.trips, cells: S.cells, settings: { ...S.set, key: '' } })], { type: 'application/json' });
