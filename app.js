@@ -66,9 +66,15 @@ function mkBase(kind) {
   ]);
   if (kind === 'nasa') return L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{time}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
     { time: yesterday, maxNativeZoom: 9, maxZoom: 20, attribution: 'NASA EOSDIS GIBS / Worldview' });
-  const style = matchMedia('(prefers-color-scheme: light)').matches ? 'voyager' : 'dark_all';
-  return L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style === 'voyager' ? 'rastertiles/voyager' : 'dark_all'}/{z}/{x}/{y}{r}.png`,
-    { subdomains: 'abcd', maxZoom: 20, attribution: '© OpenStreetMap © CARTO' });
+  const light = matchMedia('(prefers-color-scheme: light)').matches;
+  // Avec clé : carte TomTom (jour/nuit). Sans clé : OpenStreetMap (jour) ou Esri gris foncé (nuit), sans inscription.
+  if (S.set.key) return L.tileLayer(`https://api.tomtom.com/map/1/tile/basic/${light ? 'main' : 'night'}/{z}/{x}/{y}.png?key=${encodeURIComponent(S.set.key)}&tileSize=256&language=fr-FR`,
+    { maxZoom: 22, attribution: '© TomTom © OpenStreetMap' });
+  if (light) return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+  return L.layerGroup([
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 16, attribution: '© Esri, OpenStreetMap' }),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 16 })
+  ]);
 }
 let baseLayer = mkBase('plan').addTo(map);
 const BASES = ['plan', 'sat', 'nasa'], BASE_LBL = { plan: 'PLAN', sat: 'SAT', nasa: 'NASA' };
@@ -707,6 +713,7 @@ function bindPane() {
   const buf = $('#sBuf'); if (buf) buf.oninput = () => { S.set.buffer = +buf.value; $('#sBufV').textContent = buf.value; saveSet(); };
   $('#sSaveKey') && ($('#sSaveKey').onclick = async () => {
     S.set.key = $('#sKey').value.trim(); saveSet();
+    map.removeLayer(baseLayer); baseLayer = mkBase(S.base).addTo(map); baseLayer.bringToBack?.();
     if (!S.set.key) { setTraffic(false); toast('Clé retirée.'); return; }
     // Test sur un vrai trajet court (Plateau → Cocody), API classique puis Orbis
     const k = encodeURIComponent(S.set.key), q = `/5.3200,-4.0170:5.3480,-3.9900/json?key=${k}&traffic=true`;
