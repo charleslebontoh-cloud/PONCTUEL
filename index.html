@@ -166,7 +166,7 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
 .toggle input{width:20px;height:20px;accent-color:var(--signal)}
 .note{background:var(--glass-2);border-left:3px solid var(--signal);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin:10px 0}
 .note b{color:var(--text)}.note a{color:var(--signal)}
-.vgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.vgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .vopt{border:1px solid var(--line);background:var(--glass-2);border-radius:12px;padding:8px 4px 6px;display:grid;justify-items:center;gap:4px;font-size:11px;font-weight:700}
 .vopt svg{width:40px;height:40px}
 .vopt.on{border-color:var(--signal);box-shadow:0 0 0 2px var(--signal) inset}
@@ -230,6 +230,9 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
   background:conic-gradient(from -30deg at 50% 100%,rgba(61,155,255,.45),rgba(61,155,255,0) 60deg,transparent 0);border-radius:50% 50% 0 0;pointer-events:none}
 .veh{width:76px;height:76px;display:grid;place-items:center;filter:drop-shadow(0 8px 10px rgba(0,0,0,.6))}
 .veh svg{width:76px;height:76px}
+.veh.v3d{width:92px;height:92px;filter:drop-shadow(0 10px 9px rgba(0,0,0,.55)) drop-shadow(0 0 1px rgba(0,0,0,.4))}
+.veh .car3d{width:92px;height:92px}
+.vopt .car3d{display:block}
 .pin{font:800 12px var(--display);width:28px;height:28px;border-radius:9px 9px 9px 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.4);animation:pop .4s ease-out}
 .pin span{transform:rotate(45deg)}
 .pin.a{background:var(--route);color:#fff}.pin.b{background:var(--signal);color:var(--signal-ink)}
@@ -322,6 +325,6 @@ label.set input[type=text],label.set input[type=password]{width:100%;background:
 <div id="toast" hidden></div>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
