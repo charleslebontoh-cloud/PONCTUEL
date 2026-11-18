@@ -93,7 +93,7 @@ const MAN = {
   'sharp-left': '<path d="M32 42V12L12 32M12 20v12h12"/>',
   'sharp-right': '<path d="M16 42V12l20 20M36 20v12H24"/>',
   uturn: '<path d="M30 42V18a8 8 0 0 0-16 0v16M7 27l7 8 7-8"/>',
-  roundabout: '<circle cx="24" cy="18" r="8"/><path d="M24 42V26M30 12l8-6M31 5h7v7"/>',
+  roundabout: '<path d="M22 44V31a9 9 0 1 1 9-9h9M35 16l6 6-6 6"/>',
   arrive: '<path d="M24 43s13-12 13-23a13 13 0 0 0-26 0c0 11 13 23 13 23z"/><circle cx="24" cy="20" r="4.5"/>'
 };
 const manSvg = d => `<svg viewBox="0 0 48 48">${MAN[d] || MAN.straight}</svg>`;
@@ -748,16 +748,17 @@ function navUpdate() {
   if (bd > 1000) for (let i = 0; i < r.coords.length - 1; i++) { const q = distToSeg(p, r.coords[i], r.coords[i + 1]); if (q.d < bd) { bd = q.d; best = i; bt = q.t; } }
   n.idx = best;
   const done = r.cum[best] + (r.cum[best + 1] - r.cum[best]) * bt; n.done = done;
+  const a0 = r.coords[best], a1 = r.coords[Math.min(best + 1, r.coords.length - 1)];
+  const snapped = bd < 40 ? [a0[0] + (a1[0] - a0[0]) * bt, a0[1] + (a1[1] - a0[1]) * bt] : p;
+  if (bd < 40) { anim.to = snapped; if (a0 !== a1 && S.speed < 25) { S.heading = bearingOf(a0, a1); anim.h1 = S.heading; } }
   const left = r.dist - done, leftT = r.dur * (left / r.dist), eta = new Date(Date.now() + leftT * 1000);
-  // Sans cap GPS (arrêt), on prend la direction de la route
-  if (S.heading == null || S.speed < 4) { const a = r.coords[best], b = r.coords[Math.min(best + 1, r.coords.length - 1)]; if (a !== b) { S.heading = bearingOf(a, b); anim.h1 = S.heading; } }
   $('#nEta').textContent = fmtTime(eta); $('#nLeft').textContent = fmtDur(leftT); $('#nKm').textContent = (left / 1000).toFixed(1).replace('.', ',');
   $('#nEtaBox').classList.toggle('late', !!(n.planned && eta.getTime() > n.planned));
   $('#nProg').style.width = Math.min(100, done / r.dist * 100).toFixed(1) + '%';
   const sp = Math.round(S.speed); $('#spd').textContent = sp;
   $('#spdArc').setAttribute('stroke-dasharray', `${Math.min(155, sp / 130 * 155).toFixed(0)} 300`);
   $('#spdArc').setAttribute('stroke', sp > 90 ? 'var(--jam)' : sp > 60 ? 'var(--slow)' : 'var(--go)');
-  const doneCoords = r.coords.slice(0, best + 1); doneCoords.push(p); setData('done', lineFC(doneCoords));
+  const doneCoords = r.coords.slice(0, best + 1); doneCoords.push(snapped); setData('done', lineFC(doneCoords));
   const idxNext = r.steps.findIndex(s => s.off > done + 5), st = r.steps[idxNext], nx = r.steps[idxNext + 1];
   if (st) {
     const d = st.off - done;
@@ -884,7 +885,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 4 · carte 3D vectorielle</p>
+  <p class="empty" style="font-size:12px">Version 6 · carte 3D, véhicule calé sur la route</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
