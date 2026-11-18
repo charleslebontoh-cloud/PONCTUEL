@@ -176,9 +176,20 @@ const SAT_TILES = [
   { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', opacity: .75 },
   { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', opacity: .9 }
 ];
+// Carte 3D TomTom Orbis (avec la clé) : bâtiments 3D éclairés, icônes de lieux, style nuit soigné
+let orbisOk = null, orbisUrl = null;
+async function orbisStyle(map) {
+  if (!S.set.key || S.set.engine === 'ofm' || orbisOk === false) return null;
+  const k = encodeURIComponent(S.set.key), q = `?key=${k}&apiVersion=1&map=${map}`;
+  const urls = orbisUrl ? [orbisUrl] : ['0.*/style.json', '0.*/style', '0.0.0-0/style.json', '0.0.0-0/style'].map(v => `https://api.tomtom.com/maps/orbis/assets/styles/${v}`);
+  for (const u of urls) {
+    try { const st = await getJSON(u + q, 8000); if (st?.layers?.length) { orbisUrl = u; orbisOk = true; st.__orbis = true; return st; } } catch (e) { console.warn('Orbis', u, e.message); }
+  }
+  orbisOk = false; return null;
+}
 async function styleFor(kind) {
-  if (kind === 'sat') return rasterStyle(SAT_TILES);
   const night = nightNow();
+  if (kind === 'sat') return (await orbisStyle('basic_street-satellite')) || rasterStyle(SAT_TILES);
   if (kind === 'nasa') { // carte normale + nuages/météo NASA en transparence
     const st = await styleFor('plan');
     st.sources.nasa = { type: 'raster', tileSize: 256, maxzoom: 9, attribution: 'NASA EOSDIS GIBS (MODIS)',
@@ -187,6 +198,7 @@ async function styleFor(kind) {
     st.layers.splice(i < 0 ? st.layers.length : i, 0, { id: 'nasa', type: 'raster', source: 'nasa', paint: { 'raster-opacity': .55 } });
     return st;
   }
+  const orb = await orbisStyle(`basic_street-${night ? 'dark' : 'light'}${S.nav ? '-driving' : ''}`); if (orb) return orb;
   try { return await getJSON(OFM + (night ? 'dark' : 'liberty'), 8000); }
   catch (e) {
     console.warn('OpenFreeMap indisponible, carte de secours', e);
@@ -197,7 +209,8 @@ async function styleFor(kind) {
 const startView = store.get('view', ABIDJAN);
 const map = new maplibregl.Map({
   container: 'map', style: rasterStyle([], {}), center: ll(startView), zoom: store.get('zoom', 13),
-  pitch: S.set.three ? 45 : 0, maxPitch: 75, attributionControl: { compact: true }, dragRotate: true, pitchWithRotate: true, fadeDuration: 150
+  pitch: S.set.three ? 45 : 0, maxPitch: 75, attributionControl: { compact: true }, dragRotate: true, pitchWithRotate: true, fadeDuration: 150,
+  transformRequest: url => (/^https:\/\/api\.tomtom\.com\//.test(url) && !/[?&]key=/.test(url) && S.set.key) ? { url: url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(S.set.key) } : { url }
 });
 map.touchZoomRotate.enableRotation();
 map.on('moveend', () => { const c = map.getCenter(); store.set('view', [c.lat, c.lng]); store.set('zoom', map.getZoom()); });
@@ -206,7 +219,12 @@ async function applyBase() {
   map.setStyle(st, { diff: false });
 }
 applyBase();
-map.on('style.load', () => { addOverlays(); });
+map.on('style.load', () => { addOverlays(); atmosphere(); });
+function atmosphere() {
+  const night = nightNow();
+  try { map.setLight({ anchor: 'map', position: [1.4, 210, 35], color: night ? '#c8d4ff' : '#ffffff', intensity: night ? .35 : .45 }); } catch { }
+  try { map.setSky?.({ 'sky-color': night ? '#0a1426' : '#8ec5ff', 'horizon-color': night ? '#1d3358' : '#dcecff', 'fog-color': night ? '#0b1220' : '#eef4fb', 'sky-horizon-blend': .6, 'horizon-fog-blend': .7, 'fog-ground-blend': .4 }); } catch { }
+}
 
 const BASES = ['plan', 'sat', 'nasa'], BASE_LBL = { plan: 'PLAN', sat: 'SAT', nasa: 'NASA' };
 $('#bLayer').onclick = () => {
@@ -230,7 +248,7 @@ function addOverlays() {
   const omt = st.sources.openmaptiles;
   if (omt && !st.layers.some(l => l.type === 'fill-extrusion')) {
     map.addLayer({ id: 'b3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14,
-      paint: { 'fill-extrusion-color': nightNow() ? '#2a3546' : '#dcd6cc', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .82 } }, firstSymbol());
+      paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, nightNow() ? '#1f2a3b' : '#d9d2c6', 40, nightNow() ? '#34465f' : '#ece6dc', 120, nightNow() ? '#4a6185' : '#f7f3ec'], 'fill-extrusion-vertical-gradient': true, 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .82 } }, firstSymbol());
   }
   set3DBuildings(S.set.three);
   if (S.traffic && S.set.key) {
@@ -770,6 +788,7 @@ async function startNav() {
   $('#nav').hidden = false; $('#navbar').hidden = false; $('#speed').hidden = false;
   $('#fab').style.bottom = 'calc(env(safe-area-inset-bottom,0px) + 110px)'; setData('alts', EMPTY); setTimeout(syncSheet, 50);
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { }
+  if (orbisOk && S.base === 'plan') applyBase();
   speak(`C'est parti. Arrivée prévue à ${fmtTime(new Date(Date.now() + r.dur * 1000))}.`);
   goFollow();
   if (S.pos) navUpdate(); else toast('En attente du GPS…');
@@ -789,7 +808,7 @@ function stopNav(arrived) {
   $('#fab').style.bottom = '';
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
   map.easeTo({ bearing: 0, pitch: S.set.three ? 45 : 0, duration: 800 });
-  meMode = ''; meLook(); refreshCompass(); setData('done', EMPTY); drawRoutes(false); render();
+  meMode = ''; meLook(); refreshCompass(); setData('done', EMPTY); drawRoutes(false); render(); if (orbisOk && S.base === 'plan') applyBase();
 }
 $('#nStop').onclick = () => stopNav(false);
 $('#nMute').onclick = () => { S.set.voice = !S.set.voice; saveSet(); $('#nMute').textContent = S.set.voice ? '🔊' : '🔇'; };
@@ -927,6 +946,9 @@ function settingsHtml() {
   return `<h3 style="margin-top:4px">Mon véhicule sur la carte</h3>
   <div class="vgrid">${Object.entries(VEHICLES).map(([k, n]) => `<button class="vopt ${s.vehicle === k ? 'on' : ''}" data-veh="${k}">${REAL_CARS[k] ? `<span class="c3slot" data-t="${k}"></span>` : vehicleSVG(k, s.vcolor)}${n}</button>`).join('')}</div>
   <div class="swatches">${COLORS.map(c => `<button class="sw ${s.vcolor === c ? 'on' : ''}" data-col="${c}" style="background:${c}" aria-label="Couleur ${c}"></button>`).join('')}</div>
+  <h3>Moteur de carte</h3>
+  <div class="seg">${[['tomtom', 'TomTom 3D'], ['ofm', 'OpenStreetMap']].map(([k, n]) => `<button data-eng="${k}" class="${(s.engine || 'tomtom') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+  <p class="empty" style="font-size:12px">${s.key ? (orbisOk === false ? 'Carte TomTom indisponible pour cette clé : OpenStreetMap utilisé.' : 'TomTom 3D : bâtiments en relief, icônes de lieux, style conduite pendant le guidage.') : 'TomTom 3D nécessite la clé TomTom (plus bas).'}</p>
   <h3>Style de carte</h3>
   <div class="seg">${[['auto', 'Auto jour/nuit'], ['day', 'Jour'], ['night', 'Nuit']].map(([k, n]) => `<button data-ms="${k}" class="${s.mapStyle === k ? 'on' : ''}">${n}</button>`).join('')}</div>
   <label class="set"><span>Clé TomTom (trafic en direct)</span><input type="password" id="sKey" value="${esc(s.key)}" placeholder="Collez votre clé ici" autocomplete="off">
@@ -938,7 +960,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 9 · véhicule Kaiyi X7</p>
+  <p class="empty" style="font-size:12px">Version 10 · carte TomTom 3D</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -956,6 +978,7 @@ function bindPane() {
   pane.querySelectorAll('.c3slot').forEach(sl => sl.replaceWith(car3dCanvas(S.set.vcolor, 'width:48px;height:48px', sl.dataset.t)));
   pane.querySelectorAll('[data-veh]').forEach(b => b.onclick = () => { S.set.vehicle = b.dataset.veh; saveSet(); meMode = ''; meLook(); render(); toast(`Véhicule : ${VEHICLES[S.set.vehicle]}. Il apparaît pendant le guidage.`); });
   pane.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { S.set.vcolor = b.dataset.col; saveSet(); meMode = ''; meLook(); render(); });
+  pane.querySelectorAll('[data-eng]').forEach(b => b.onclick = () => { S.set.engine = b.dataset.eng; saveSet(); orbisOk = null; render(); applyBase(); });
   pane.querySelectorAll('[data-ms]').forEach(b => b.onclick = () => { S.set.mapStyle = b.dataset.ms; saveSet(); render(); if (S.base === 'plan') applyBase(); });
   pane.querySelectorAll('[data-pgo]').forEach(b => b.onclick = () => { const p = S.places.find(x => x.id === b.dataset.pgo); setB({ lat: p.lat, lng: p.lng, name: p.name }); calc(); });
   pane.querySelectorAll('[data-pedit]').forEach(b => b.onclick = () => { const e = $('#e_' + b.dataset.pedit); e.hidden = !e.hidden; syncSheet(); });
@@ -971,7 +994,7 @@ function bindPane() {
     const tries = [['classique', `https://api.tomtom.com/routing/1/calculateRoute${q}`], ['orbis', `https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`]];
     let ok = null, lastErr = '';
     for (const [name, u] of tries) { try { const j = await getJSON(u); if (j.routes?.length) { ok = name; break; } } catch (e) { lastErr = String(e.message); } }
-    if (ok) { S.set.orbis = ok === 'orbis'; saveSet(); toast(`Clé valide : trafic en direct activé (API ${ok}).`, 5000); setTraffic(true); }
+    if (ok) { S.set.orbis = ok === 'orbis'; saveSet(); toast(`Clé valide : trafic en direct et carte TomTom 3D activés.`, 5000); setTraffic(true); orbisOk = null; applyBase(); }
     else toast(/40[13]/.test(lastErr) ? 'Clé refusée par TomTom. Recopiez-la depuis MyTomTom → Keys, sans espace.' : 'Test impossible pour l’instant (réseau). La clé est enregistrée ; réessayez plus tard.', 7000);
   });
   $('#sExport') && ($('#sExport').onclick = () => {
