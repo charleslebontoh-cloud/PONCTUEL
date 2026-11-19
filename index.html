@@ -8,9 +8,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png" type="image/png">
-<link rel="preload" as="image" href="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png">
-<link rel="apple-touch-icon" href="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png">
+<link rel="icon" href="media/icon-64.png" type="image/png">
+<link rel="preload" as="image" href="media/intro-poster.jpg">
+<link rel="apple-touch-icon" sizes="180x180" href="media/icon-180.png">
+<meta name="apple-mobile-web-app-title" content="Ponctuel">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -401,16 +402,54 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 #splash.vid .slogo img{animation:none}
 #skipSplash{position:absolute;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 22px);border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#dfe8f5;border-radius:999px;padding:8px 16px;font:700 13px var(--body)}
 
+
+/* ===== Ponctuel IA ===== */
+#bAI{border:0;color:#fff;background:conic-gradient(from 200deg,#7c5cff,#3d9bff,#40e0ff,#ffb21e,#ff5c8a,#7c5cff);box-shadow:0 10px 26px rgba(124,92,255,.45),inset 0 1px 0 rgba(255,255,255,.4);animation:aiSpin 8s linear infinite}
+#bAI::before{content:"";position:absolute;inset:2px;border-radius:12px;background:radial-gradient(circle at 30% 25%,rgba(30,20,70,.55),rgba(10,14,30,.85))}
+#bAI > *{position:relative}
+@keyframes aiSpin{to{filter:hue-rotate(360deg)}}
+#aiPanel{position:fixed;z-index:980;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;height:min(78vh,640px);border-radius:24px 24px 0 0;border-bottom:0;display:flex;flex-direction:column;animation:rise .35s cubic-bezier(.2,1.2,.4,1);
+  padding:12px max(14px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(14px,env(safe-area-inset-left,0px))}
+.aihead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.aihead div:nth-child(2){flex:1}
+.aihead b{display:block;font:800 18px var(--display);letter-spacing:-.02em}
+.aihead small{color:var(--muted);font-size:12px;font-weight:600}
+.aihead .x{border:0;background:var(--glass-2);border-radius:10px;width:34px;height:34px;display:grid;place-items:center}
+.aiorb{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;background:conic-gradient(from 0deg,#7c5cff,#3d9bff,#40e0ff,#ffb21e,#ff5c8a,#7c5cff);animation:spin 6s linear infinite;box-shadow:0 0 22px rgba(124,92,255,.5)}
+.aiorb .ic{animation:spin 6s linear infinite reverse}
+.aiorb.think{animation-duration:1.2s;box-shadow:0 0 34px rgba(64,224,255,.8)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#aiLog{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px 8px;user-select:text;-webkit-user-select:text}
+.msg{max-width:88%;padding:10px 13px;border-radius:16px;font-size:15px;line-height:1.45;animation:pop .25s ease-out;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--route),var(--route-2));color:#fff;border-bottom-right-radius:5px}
+.msg.ai{align-self:flex-start;background:var(--glass-2);border:1px solid var(--line);border-bottom-left-radius:5px}
+.msg.ai b{color:var(--signal)}
+.msg.card{max-width:100%;width:100%;background:linear-gradient(140deg,rgba(124,92,255,.18),rgba(64,224,255,.10));border:1px solid rgba(124,92,255,.35)}
+.msg.card h4{margin:0 0 6px;font:800 14px var(--display);display:flex;gap:6px;align-items:center}
+.msg.card h4 .ic{width:16px;height:16px;color:#b9a8ff}
+.msg.card ul{margin:0;padding-left:18px}
+.msg.card li{margin:3px 0}
+.typing{display:inline-flex;gap:4px}.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:blink 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+.aichips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 8px}
+.aichips button{flex:none;border:1px solid var(--line);background:var(--glass-2);border-radius:999px;padding:7px 12px;font:600 12.5px var(--body);white-space:nowrap}
+.aiform{display:flex;gap:8px;align-items:center}
+.aiform input{flex:1;min-width:0;background:var(--glass-2);border:1px solid var(--line);border-radius:999px;padding:12px 14px;color:var(--text);font:500 15px var(--body);outline:none}
+.aiform input:focus{border-color:#7c5cff}
+.aimic,.aisend{width:46px;height:46px;border-radius:50%;border:0;display:grid;place-items:center;flex:none}
+.aimic{background:var(--glass-2);color:var(--text);border:1px solid var(--line)}
+.aimic.on{background:#ff3b5c;color:#fff;animation:ring 1.2s infinite}
+.aisend{background:linear-gradient(135deg,#7c5cff,#3d9bff);color:#fff;box-shadow:0 6px 16px rgba(124,92,255,.4)}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
 </head>
 <body>
-<div id="splash"><div class="slogo"><img src="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png" alt="Ponctuel – Toujours à l’heure, en tout lieu"><video id="splashVid" src="https://cdn.creativeclaw.co/u/79610596/videos/a4823b6f-9059-46ad-b5ce-0ce03008b8e8.mp4" poster="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png" muted playsinline autoplay preload="auto" aria-hidden="true"></video></div><div class="bar"><i></i></div><button id="skipSplash">Passer</button></div>
+<div id="splash"><div class="slogo"><img src="media/logo.jpg" alt="Ponctuel – Toujours à l’heure, en tout lieu"><video id="splashVid" src="media/intro.mp4" poster="media/intro-poster.jpg" muted playsinline webkit-playsinline autoplay preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true"></video></div><div class="bar"><i></i></div><button id="skipSplash">Passer</button></div>
 <div id="map" role="application" aria-label="Carte"></div>
 
 <section id="top" class="glass">
-  <div class="brand"><h1><img class="blogo" src="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png" alt="">Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
+  <div class="brand"><h1><img class="blogo" src="media/icon-192.png" alt="">Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
   <div class="fields">
     <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
     <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser"><span data-ic="swap"></span></button>
@@ -434,6 +473,7 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </div>
 
 <div id="fab">
+  <button class="ctl" id="bAI" title="Ponctuel IA : parlez à votre copilote" aria-label="Ponctuel IA"><span data-ic="sparkle"></span><small>IA</small></button>
   <button class="ctl glass" id="bLocate" title="Recentrer sur ma position" aria-label="Recentrer"><span data-ic="locate"></span></button>
   <button class="ctl glass" id="b3d" title="Vue 2D / 3D" aria-label="Vue 3D"><span data-ic="cube"></span><small id="b3dLbl">3D</small></button>
   <button class="ctl glass" id="bTraffic" title="Trafic en direct" aria-label="Trafic en direct"><span data-ic="traffic"></span><small>Trafic</small></button>
@@ -494,6 +534,20 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
   <p class="empty" style="font-size:12px;margin:12px 0 0">Vos signalements restent sur votre téléphone : Ponctuel vous prévient la prochaine fois que vous passez à proximité.</p>
 </section>
 <section id="arrival" class="sheet2 glass" hidden aria-label="Arrivée"></section>
+<section id="aiPanel" class="glass" hidden aria-label="Ponctuel IA">
+  <header class="aihead">
+    <div class="aiorb"><span data-ic="sparkle"></span></div>
+    <div><b>Ponctuel IA</b><small id="aiMode">Copilote local</small></div>
+    <button class="x" id="aiClose" aria-label="Fermer"><span data-ic="x"></span></button>
+  </header>
+  <div id="aiLog" aria-live="polite"></div>
+  <div class="aichips" id="aiChips"></div>
+  <form id="aiForm" class="aiform" autocomplete="off">
+    <button type="button" id="aiMic" class="aimic" aria-label="Parler"><span data-ic="mic"></span></button>
+    <input id="aiIn" placeholder="Demandez-moi : « Je dois être à la BHCI à 7 h 30 »" aria-label="Votre demande">
+    <button type="submit" class="aisend" aria-label="Envoyer"><span data-ic="send"></span></button>
+  </form>
+</section>
 <canvas id="confetti" hidden></canvas>
 <section id="alarm" hidden role="alertdialog" aria-label="Réveil de départ">
   <div class="ring"><span data-ic="bell"></span></div>
@@ -512,6 +566,6 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

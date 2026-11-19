@@ -11,22 +11,21 @@
  "lang": "fr",
  "icons": [
   {
-   "src": "https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png",
-   "sizes": "1232x1232",
+   "src": "media/icon-192.png",
+   "sizes": "192x192",
    "type": "image/png",
    "purpose": "any"
   },
   {
-   "src": "https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png",
+   "src": "media/icon-512.png",
    "sizes": "512x512",
    "type": "image/png",
    "purpose": "any"
   },
   {
-   "src": "https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png",
-   "sizes": "192x192",
-   "type": "image/png",
-   "purpose": "any"
+   "src": "media/icon-180.png",
+   "sizes": "180x180",
+   "type": "image/png"
   }
  ]
 }

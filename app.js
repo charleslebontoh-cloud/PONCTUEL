@@ -84,6 +84,9 @@ const ICONS = {
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7zM5 3l.6 1.6L7.2 5.2 5.6 5.8 5 7.4 4.4 5.8 2.8 5.2 4.4 4.6z"/>',
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/>',
+  send: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -108,8 +111,8 @@ const savePlaces = () => store.set('places', S.places);
 const VEHICLES = { kaiyi: 'Kaiyi X7', car3d: 'Berline 3D', arrow: 'Flèche', car: 'Berline', suv: '4x4', taxi: 'Taxi', moto: 'Moto', bus: 'Gbaka', truck: 'Camion', puck: 'Point' };
 // Rendu 3D réaliste (généré pour Ponctuel), recoloré en direct sur canvas
 const REAL_CARS = {
-  kaiyi: 'https://cdn.creativeclaw.co/u/79610596/images/fa572658-0920-4b88-a52e-00e63c535c73.png', // SUV Kaiyi X7, vue de dessus
-  car3d: 'https://cdn.creativeclaw.co/u/79610596/images/4fcd3f87-0a02-42ab-83aa-d46c5647b590.png'
+  kaiyi: 'media/kaiyi.png', // SUV Kaiyi X7, vue de dessus
+  car3d: 'media/car3d.png'
 };
 const realCache = {};
 function loadReal(type, cb) {
@@ -269,9 +272,10 @@ const splashT0 = Date.now();
 let splashMin = 1800, splashForce = false;
 (() => { const v = document.getElementById('splashVid'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) { v?.remove(); return; }
   let faded = false;
-  const start = () => { if (v.classList.contains('on') || faded) return; v.classList.add('on'); $('#splash').classList.add('vid'); splashMin = 5200; };
+  const start = () => { if (v.classList.contains('on') || faded) return; v.classList.add('on'); $('#splash').classList.add('vid'); splashMin = 6500; };
   v.addEventListener('playing', start, { once: true }); if (!v.paused && v.readyState > 2) start();
-  v.addEventListener('timeupdate', () => { if (!faded && v.currentTime >= 3.9) { faded = true; v.classList.remove('on'); } });
+  v.addEventListener('ended', () => { faded = true; v.classList.remove('on'); setTimeout(() => { splashForce = true; hideSplash(); }, 650); });
+  setTimeout(() => { if (!v.classList.contains('on')) { v.remove(); splashMin = 1800; } }, 1500); // vidéo pas prête : logo fixe
   v.addEventListener('error', () => v.remove());
   v.play?.().catch(() => { }); })();
 document.getElementById('splash')?.addEventListener('click', () => { splashForce = true; hideSplash(); });
@@ -773,7 +777,7 @@ async function checkDestination() {
   if (!S.destJam) { const sp = learnedSpeed([b.lat, b.lng], new Date()); if (sp != null && sp < 12) S.destJam = { coords: [[b.lat, b.lng]], at: [b.lat, b.lng], speed: Math.round(sp), mag: 2, delay: 0, dest: true, src: 'perso' }; }
 }
 function satList() { const r = S.routes[S.sel]; const l = (r?.jams || []).filter(j => j.mag >= 2 || j.delay >= 60); if (S.destJam) l.unshift(S.destJam); return l; }
-function autoSatellite() { if (satList().length) openSat(0); }
+function autoSatellite() { if (satList().length && $('#aiPanel').hidden) openSat(0); }
 
 /* ================= Vue satellite (survol façon drone) ================= */
 let satMap = null, orbit = false;
@@ -806,7 +810,7 @@ function showSat() {
   if (j.speed != null) bits.push(`${Math.round(j.speed)} km/h${j.free ? ` (normal ${Math.round(j.free)})` : ''}`);
   if (j.delay) bits.push(`+${fmtDur(j.delay)}`);
   if (j.len) bits.push(fmtKm(j.len));
-  if (j.startOff != null && !j.dest) bits.push(`dans ${fmtKm(j.startOff)}`);
+  if (j.startOff != null && !j.dest) bits.push(j.startOff < 50 ? 'dès le départ' : `dans ${fmtKm(j.startOff)}`);
   $('#satSub').textContent = bits.join(' · ');
   $('#satCap').textContent = j.src === 'perso' ? 'Bouchon prévu d’après vos trajets passés à cette heure. Image satellite haute résolution (date de prise variable).'
     : 'Trafic mesuré en direct (TomTom) superposé à l’image satellite haute résolution. L’image elle-même n’est pas filmée en direct.';
@@ -845,7 +849,7 @@ setInterval(async () => { // trafic temps réel : itinéraires recalculés toute
 }, 120000);
 function notify(title, body) {
   toast(title + ' — ' + body, 8000); speak(title);
-  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(title, { body, icon: 'https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png', tag: 'ponctuel' })).catch(() => new Notification(title, { body })); } catch { }
+  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(title, { body, icon: 'media/icon-192.png', tag: 'ponctuel' })).catch(() => new Notification(title, { body })); } catch { }
   navigator.vibrate?.([200, 100, 200]);
 }
 
@@ -1027,13 +1031,16 @@ function settingsHtml() {
   <label class="set"><span>Clé TomTom (trafic en direct)</span><input type="password" id="sKey" value="${esc(s.key)}" placeholder="Collez votre clé ici" autocomplete="off">
     <small>Gratuite, sans carte bancaire : <a href="https://developer.tomtom.com/user/register" target="_blank" rel="noopener" style="color:var(--signal)">developer.tomtom.com</a> → Keys → copier la clé. Elle reste sur votre téléphone.</small></label>
   <div class="btns"><button class="btn primary" id="sSaveKey">Enregistrer et tester</button></div>
+  <label class="set"><span>Clé API Claude (optionnelle, IA avancée)</span><input type="password" id="sAIKey" value="${esc(s.aiKey || '')}" placeholder="sk-ant-…" autocomplete="off">
+    <small>Sans clé, Ponctuel IA comprend déjà les demandes courantes. Avec une clé Claude (console.anthropic.com → API Keys), elle comprend tout et agit dans l’appli. Facturé sur votre compte Anthropic ; la clé reste sur ce téléphone.</small></label>
+  <div class="btns"><button class="btn" id="sSaveAI">${ic('sparkle')}Enregistrer la clé Claude</button></div>
   <label class="set"><span>Marge de sécurité : <b class="num" id="sBufV">${s.buffer}</b> min</span><input type="range" id="sBuf" min="0" max="45" step="5" value="${s.buffer}" style="width:100%;accent-color:var(--signal)"></label>
   ${[['track', 'Suivi et mémorisation des lieux', 'Apprend vos lieux fréquents et les rues où vous roulez au pas.'], ['autoSat', 'Vue satellite automatique', 'S’ouvre dès qu’un bouchon est trouvé sur le trajet ou à destination.'], ['voice', 'Guidage vocal', ''], ['reroute', 'Recalcul automatique', 'Hors itinéraire ou si une route plus rapide apparaît (≥ 3 min gagnées).'], ['tolls', 'Éviter les péages', 'Ex. autoroute du Nord, pont HKB (avec clé TomTom).'], ['highways', 'Éviter les autoroutes', '']]
       .map(([k, t, d]) => `<label class="toggle"><span><b>${t}</b>${d ? `<br><small style="color:var(--muted)">${d}</small>` : ''}</span><input type="checkbox" data-set="${k}" ${s[k] ? 'checked' : ''}></label>`).join('')}
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 15 · ouverture animée</p>
+  <p class="empty" style="font-size:12px">Version 16 · Ponctuel IA</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1060,6 +1067,7 @@ function bindPane() {
   pane.querySelectorAll('[data-ptag]').forEach(b => b.onclick = () => { const [id, tag] = b.dataset.ptag.split('|'); if (tag) S.places.forEach(p => { if (p.tag === tag) p.tag = ''; }); S.places.find(x => x.id === id).tag = tag; savePlaces(); renderPlaces(); render(); });
   pane.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { S.places = S.places.filter(x => x.id !== b.dataset.pdel); savePlaces(); renderPlaces(); render(); });
   pane.querySelectorAll('[data-set]').forEach(c => c.onchange = () => { S.set[c.dataset.set] = c.checked; saveSet(); });
+  $('#sSaveAI') && ($('#sSaveAI').onclick = () => { S.set.aiKey = $('#sAIKey').value.trim(); saveSet(); aiClient = null; toast(S.set.aiKey ? 'Clé Claude enregistrée : Ponctuel IA passe en mode avancé.' : 'Clé Claude retirée : mode local.', 3500, 'sparkle'); });
   const buf = $('#sBuf'); if (buf) buf.oninput = () => { S.set.buffer = +buf.value; $('#sBufV').textContent = buf.value; saveSet(); };
   $('#sSaveKey') && ($('#sSaveKey').onclick = async () => {
     S.set.key = $('#sKey').value.trim(); saveSet();
@@ -1314,7 +1322,7 @@ function fireAlarm(a, kind) {
   const say = kind === 'pre' ? `Préparez-vous. Départ dans ${Math.max(1, Math.round((o.leave - Date.now()) / 60000))} minutes pour ${a.dest.name}.`
     : `Il est temps de partir pour ${a.dest.name}. Trajet de ${Math.round(o.dur / 60)} minutes${o.delay > 120 ? `, dont ${Math.round(o.delay / 60)} minutes de bouchons` : ''}.`;
   setTimeout(() => { const v = S.set.voice; S.set.voice = true; speak(say); S.set.voice = v; }, 2500);
-  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(kind === 'pre' ? 'Préparez-vous' : 'Partez maintenant', { body: say, icon: 'https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png', tag: 'ponctuel-alarm', requireInteraction: true })); } catch { }
+  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(kind === 'pre' ? 'Préparez-vous' : 'Partez maintenant', { body: say, icon: 'media/icon-192.png', tag: 'ponctuel-alarm', requireInteraction: true })); } catch { }
   try { navigator.wakeLock?.request('screen')?.catch(() => { }); } catch { }
   injectIcons(box);
 }
@@ -1428,3 +1436,236 @@ function keepDraft() {
   draft.prep = +($('#fPrep')?.value ?? draft.prep); draft.from = $('#fFrom')?.value || draft.from;
 }
 injectIcons(); refreshAlarmPill();
+
+
+/* ================= Ponctuel IA =================
+   1) Copilote local (gratuit, hors ligne pour l'analyse) : comprend le français courant et agit.
+   2) Mode avancé avec la clé Claude de l'utilisateur : Claude comprend tout et pilote l'appli via des outils. */
+const norm = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
+const aiLog = () => $('#aiLog');
+function aiSay(html, cls = 'ai', speakText) {
+  const d = document.createElement('div'); d.className = 'msg ' + cls; d.innerHTML = html; aiLog().appendChild(d); aiLog().scrollTop = 1e9;
+  if (speakText && cls !== 'me') { const v = S.set.voice; S.set.voice = true; speak(speakText); S.set.voice = v; }
+  return d;
+}
+function aiThinking(on) { $('.aiorb').classList.toggle('think', on); let t = $('#aiTyping'); if (on && !t) { t = aiSay('<span class="typing"><i></i><i></i><i></i></span>'); t.id = 'aiTyping'; } if (!on) t?.remove(); }
+// ---- Compréhension du français (heures, jours, lieux) ----
+function parseTime(t) { const m = t.match(/(\d{1,2})\s*(?:h|heures?|:)\s*(\d{2})?/) || t.match(/\b(\d{1,2})\s*(?:du matin|du soir)\b/); if (!m) return null;
+  let h = +m[1], mi = +(m[2] || 0); if (/\bdu soir|\bdans l'apres-midi/.test(t) && h < 12) h += 12; if (h > 23 || mi > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0'); }
+const DOW = { dimanche: 0, lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6 };
+function parseDay(t) {
+  const d = new Date();
+  if (/apres-demain/.test(t)) { d.setDate(d.getDate() + 2); return { date: ymd(d) }; }
+  if (/demain/.test(t)) { d.setDate(d.getDate() + 1); return { date: ymd(d) }; }
+  if (/tous les jours|chaque jour/.test(t)) return { days: [0, 1, 2, 3, 4, 5, 6] };
+  if (/en semaine|du lundi au vendredi|jours ouvr/.test(t)) return { days: [1, 2, 3, 4, 5] };
+  const every = t.match(/(?:tous les|chaque) (lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?/); if (every) return { days: [DOW[every[1]]] };
+  const one = t.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/);
+  if (one) { const tgt = DOW[one[1]]; let k = (tgt - d.getDay() + 7) % 7 || 7; d.setDate(d.getDate() + k); return { date: ymd(d) }; }
+  return null;
+}
+function extractPlace(raw) {
+  const t = raw.replace(/[?.!]+$/, '');
+  const m = t.match(/(?:\b(?:a|à|au|aux|vers|chez|jusqu'(?:a|à)|direction|destination|pour aller (?:a|à|au))\s+(?:la |le |l'|les )?)([^,]+?)(?=\s+(?:pour|a|à|avant|d'ici|demain|apres-demain|après-demain|ce soir|ce matin|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|tous|chaque|en semaine|vers \d|\d{1,2}\s*h)\b|$)/i);
+  let p = m ? m[1].trim() : null;
+  if (p && /^\d{1,2}\s*h/.test(p)) p = null;
+  return p;
+}
+async function resolvePlace(name) {
+  const n = norm(name || '');
+  if (!n) return null;
+  if (/^(la )?maison|chez moi|domicile/.test(n)) { const p = S.places.find(x => x.tag === 'home'); if (p) return { lat: p.lat, lng: p.lng, name: p.name }; }
+  if (/travail|bureau|boulot|taf/.test(n)) { const p = S.places.find(x => x.tag === 'work'); if (p) return { lat: p.lat, lng: p.lng, name: p.name }; }
+  const all = [...S.places, ...recents].map(p => ({ lat: p.lat, lng: p.lng, name: p.name }));
+  const hit = all.find(p => norm(p.name).includes(n) || n.includes(norm(p.name)));
+  if (hit) return hit;
+  try { const r = await geocode(name); if (r?.[0]) return { lat: r[0].lat, lng: r[0].lng, name: r[0].name }; } catch { }
+  return null;
+}
+// ---- Actions de l'appli exposées à l'IA ----
+const AI = {
+  async navigate({ destination, arrive_by, start_guidance }) {
+    const p = await resolvePlace(destination); if (!p) return { ok: false, error: `Lieu introuvable : ${destination}` };
+    if (arrive_by) { arriveIn.value = arrive_by; store.set('arrive', arrive_by); }
+    S.A = null; $('#inA').value = ''; setB(p);
+    const rs = await calc(); if (!rs?.length) return { ok: false, error: 'Itinéraire impossible à calculer (réseau ou GPS).' };
+    const r = rs[0], pi = planInfo(r);
+    if (start_guidance) { $('#aiPanel').hidden = true; startNav(); }
+    return { ok: true, destination: p.name, minutes: Math.round(r.dur / 60), km: +(r.dist / 1000).toFixed(1), traffic_delay_min: Math.round(r.delay / 60), jams: r.jams.filter(j => j.mag >= 3).length,
+      leave_at: pi ? fmtTime(pi.leave) : null, late_minutes_if_leave_now: pi && pi.slack < 0 ? Math.round((pi.eta - pi.t) / 60000) : null, live_traffic: r.live, guidance_started: !!start_guidance };
+  },
+  async set_alarm({ destination, arrive_time, date, days, prep_minutes }) {
+    const p = await resolvePlace(destination); if (!p) return { ok: false, error: `Lieu introuvable : ${destination}` };
+    if (!/^\d{2}:\d{2}$/.test(arrive_time || '')) return { ok: false, error: 'Heure invalide (format HH:MM attendu).' };
+    const tm = new Date(); tm.setDate(tm.getDate() + 1);
+    const a = { id: 'a' + Date.now().toString(36), on: true, dest: p, time: arrive_time, date: date || ymd(tm), days: days || [], prep: prep_minutes ?? 15, from: S.places.some(x => x.tag === 'home') ? 'home' : 'gps' };
+    alarms.push(a); saveAlarms(); armAudio(); await alarmTick();
+    const o = a.occ || {};
+    return { ok: true, destination: p.name, arrive: arrive_time, when: a.days.length ? a.days.map(d => DAYS_FULL[d]).join(' ') : dayLabel(nextTarget(a) || tm),
+      leave_at: o.leave ? fmtTime(new Date(o.leave)) : null, trip_minutes: o.dur ? Math.round(o.dur / 60) : null, traffic: o.src || null, note: o.err || null };
+  },
+  async travel_time({ destination }) {
+    const p = await resolvePlace(destination); const org = origin();
+    if (!p) return { ok: false, error: `Lieu introuvable : ${destination}` }; if (!org) return { ok: false, error: 'Position inconnue.' };
+    const r = await routeTime(org, p, null); return { ok: true, destination: p.name, minutes: Math.round(r.dur / 60), traffic_delay_min: Math.round(r.delay / 60), km: +(r.dist / 1000).toFixed(1), source: r.src, arrive_if_leave_now: fmtTime(new Date(Date.now() + r.dur * 1000)) };
+  },
+  traffic_on_route() {
+    const r = S.routes[S.sel]; if (!r) return { ok: false, error: 'Aucun itinéraire en cours.' };
+    return { ok: true, destination: S.B?.name, minutes: Math.round(r.dur / 60), traffic_delay_min: Math.round(r.delay / 60), jams: r.jams.map(j => ({ at_km: +(j.startOff / 1000).toFixed(1), speed_kmh: j.speed ? Math.round(j.speed) : null, delay_min: Math.round((j.delay || 0) / 60), severity: j.mag >= 3 ? 'bouchon' : 'ralentissement', habitual: j.src === 'perso' })), destination_congested: !!S.destJam };
+  },
+  report({ type }) {
+    const k = { bouchon: 'jam', accident: 'crash', police: 'police', danger: 'alert', 'route fermee': 'closed', inondation: 'flood' }[norm(type || '')] || type;
+    const p = anim.cur || S.pos; if (!REPORTS[k]) return { ok: false, error: 'Type inconnu.' }; if (!p) return { ok: false, error: 'Position GPS indisponible.' };
+    reports.push({ k, lat: p[0], lng: p[1], t: Date.now() }); store.set('reports', reports); renderReports(); return { ok: true, reported: REPORTS[k].n };
+  },
+  punctuality() {
+    const w = S.trips.filter(t => t.lateMin != null), late = w.filter(t => t.lateMin > 0);
+    const hours = Array(24).fill(0); Object.entries(S.cells).forEach(([k, v]) => { if (v[1] / v[0] < 15) hours[+k.split('_')[2] % 24] += v[0]; });
+    const peak = hours.indexOf(Math.max(...hours));
+    return { trips: S.trips.length, with_target: w.length, on_time_pct: w.length ? Math.round((w.length - late.length) / w.length * 100) : null,
+      avg_late_min: late.length ? Math.round(late.reduce((s, t) => s + t.lateMin, 0) / late.length) : 0, slowest_hour: Math.max(...hours) ? peak : null, buffer_min: S.set.buffer };
+  },
+  places() { return { places: S.places.map(p => ({ name: p.name, tag: p.tag || null, visits: p.visits })), recents: recents.slice(0, 6).map(r => r.name), alarms: alarms.map(a => ({ dest: a.dest.name, time: a.time, on: a.on })) }; },
+  stop_guidance() { if (!S.nav) return { ok: false, error: 'Aucun guidage en cours.' }; stopNav(false); return { ok: true }; },
+  share_eta() { if (!S.nav) return { ok: false, error: 'Lancez d’abord un guidage.' }; $('#nShare').click(); return { ok: true }; }
+};
+// ---- Briefing intelligent ----
+function briefing() {
+  const st = AI.punctuality(), items = [];
+  const next = alarms.filter(a => a.on && a.occ?.leave && nextTarget(a)).sort((x, y) => x.occ.leave - y.occ.leave)[0];
+  if (next) items.push(`Prochain départ : <b>${fmtTime(new Date(next.occ.leave))}</b> ${dayLabel(new Date(next.occ.leave))} pour ${esc(next.dest.name)} (arrivée ${next.time}, ${Math.round(next.occ.dur / 60)} min de route).`);
+  else items.push('Aucun réveil programmé. Dites par exemple : « Réveille-moi demain pour être à la BHCI à 7 h 30 ».');
+  if (st.on_time_pct != null) items.push(`Ponctualité : <b>${st.on_time_pct} %</b> de trajets à l’heure${st.avg_late_min ? `, retard moyen ${st.avg_late_min} min` : ''}.`);
+  if (st.avg_late_min > S.set.buffer / 2) items.push(`Conseil : passez votre marge de ${S.set.buffer} à <b>${Math.min(45, S.set.buffer + st.avg_late_min)} min</b>.`);
+  if (st.slowest_hour != null) items.push(`Vos bouchons habituels culminent vers <b>${st.slowest_hour} h</b> : partez avant ou après si possible.`);
+  const d = new Date(), h = d.getHours();
+  const pr = S.places.filter(p => p.hours[h] > 0 && (!S.pos || hav(S.pos, [p.lat, p.lng]) > 400)).sort((a, b) => b.hours[h] - a.hours[h])[0];
+  if (pr) items.push(`À cette heure, vous allez souvent à <b>${esc(pr.name)}</b>.`);
+  if (!S.set.key) items.push('Ajoutez la clé TomTom (Réglages) pour des prévisions avec le trafic en direct.');
+  return `<h4>${ic('sparkle')}Briefing ${fmtTime(d)}</h4><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+}
+// ---- Copilote local ----
+async function localBrain(text) {
+  const t = norm(text), time = parseTime(t), day = parseDay(t), place = extractPlace(t) || (/\b(maison|chez moi)\b/.test(t) ? 'maison' : /\b(travail|bureau|boulot)\b/.test(t) ? 'travail' : null);
+  const fmt = r => r.ok ? r : null;
+  if (/briefing|resume|ma journee|programme|bonjour|salut/.test(t) && !place) { aiSay(briefing(), 'ai card'); speak('Voici votre briefing.'); return; }
+  if (/(reveil|reveille|rappel|rappelle|alarme|previens)/.test(t)) {
+    if (!place || !time) { aiSay('Pour programmer un réveil, dites-moi <b>où</b> et <b>à quelle heure</b> vous devez arriver. Par exemple : « Réveille-moi demain pour être à la BHCI à 7 h 30 ».', 'ai', 'Où et à quelle heure devez-vous arriver ?'); return; }
+    const r = await AI.set_alarm({ destination: place, arrive_time: time, date: day?.date, days: day?.days });
+    if (!r.ok) { aiSay(r.error, 'ai', r.error); return; }
+    aiSay(`Réveil créé pour <b>${esc(r.destination)}</b>, arrivée ${r.arrive} (${r.when}).${r.leave_at ? ` Départ estimé à <b>${r.leave_at}</b>, ${r.trip_minutes} min de route (trafic ${r.traffic}). Je recalculerai avec le trafic en direct avant de sonner.` : ''}`,
+      'ai', `C'est noté. ${r.leave_at ? `Vous devrez partir vers ${r.leave_at.replace(':', ' heures ')}.` : 'Je calcule l’heure de départ.'}`);
+    return;
+  }
+  if (/(signale|signaler)/.test(t)) {
+    const type = ['bouchon', 'accident', 'police', 'danger', 'inondation'].find(k => t.includes(k)) || (/ferme/.test(t) ? 'route fermee' : null);
+    if (!type) { aiSay('Que voulez-vous signaler : bouchon, accident, police, danger, route fermée ou inondation ?', 'ai', 'Que voulez-vous signaler ?'); return; }
+    const r = AI.report({ type }); aiSay(r.ok ? `${r.reported} signalé à votre position. Merci !` : r.error, 'ai', r.ok ? `${r.reported} signalé.` : r.error); return;
+  }
+  if (/(arrete|stop|termine).*(guidage|navigation)/.test(t)) { const r = AI.stop_guidance(); aiSay(r.ok ? 'Guidage arrêté.' : r.error, 'ai', r.ok ? 'Guidage arrêté.' : r.error); return; }
+  if (/(partage|envoie).*(heure|arrivee|position)/.test(t)) { const r = AI.share_eta(); aiSay(r.ok ? 'Je prépare le message avec votre heure d’arrivée.' : r.error, 'ai'); return; }
+  if (/(retard|ponctu|statist|a l'heure)/.test(t) && !place) { const p = AI.punctuality();
+    aiSay(p.with_target ? `Sur ${p.with_target} trajets avec une heure fixée, vous êtes arrivé à l’heure <b>${p.on_time_pct} %</b> du temps${p.avg_late_min ? `, avec ${p.avg_late_min} min de retard en moyenne quand vous êtes en retard` : ''}.` : 'Je n’ai pas encore assez de trajets avec une heure d’arrivée pour juger. Fixez « Arriver à » avant vos trajets.', 'ai', 'Voici vos statistiques.'); return; }
+  if (/(combien de temps|temps de trajet|quand (dois|faut)|a quelle heure (partir|dois))/.test(t) && place) {
+    const r = await AI.travel_time({ destination: place }); if (!r.ok) { aiSay(r.error, 'ai', r.error); return; }
+    let extra = ''; if (time) { const tg = new Date(); const [hh, mm] = time.split(':'); tg.setHours(+hh, +mm, 0, 0); if (day?.date) { const [Y, M, D] = day.date.split('-'); tg.setFullYear(+Y, +M - 1, +D); }
+      const leave = new Date(tg - (r.minutes + S.set.buffer) * 60000); extra = ` Pour y être à ${time}, partez à <b>${fmtTime(leave)}</b> (marge de ${S.set.buffer} min incluse).`; }
+    aiSay(`Jusqu’à <b>${esc(r.destination)}</b> : <b>${r.minutes} min</b> (${r.km} km${r.traffic_delay_min ? `, dont ${r.traffic_delay_min} min de trafic` : ''}). Arrivée vers ${r.arrive_if_leave_now} si vous partez maintenant.${extra}`, 'ai', `${r.minutes} minutes de trajet.`); return;
+  }
+  if (/(trafic|bouchon|embouteill|circulation)/.test(t) && !place) { const r = AI.traffic_on_route();
+    if (!r.ok) { aiSay('Dites-moi votre destination et je vérifie le trafic sur le trajet. Exemple : « Comment est le trafic pour aller au Plateau ? »', 'ai'); return; }
+    const big = r.jams.filter(j => j.severity === 'bouchon');
+    aiSay(`Vers ${esc(r.destination)} : ${r.minutes} min${r.traffic_delay_min ? `, dont <b>${r.traffic_delay_min} min de bouchons</b>` : ', trafic fluide'}.${big.length ? ` ${big.length} gros bouchon${big.length > 1 ? 's' : ''}, le premier ${big[0].at_km < 0.3 ? 'dès le départ' : 'à ' + String(big[0].at_km).replace('.', ',') + ' km'}.` : ''}${r.destination_congested ? ' La destination elle-même est embouteillée.' : ''}`, 'ai', r.traffic_delay_min ? `Attention, ${r.traffic_delay_min} minutes de bouchons.` : 'Le trafic est fluide.'); return; }
+  if (place && /(emmene|amene|aller|va |vas |allons|itineraire|guide|direction|route|je dois etre|je vais|trafic|y aller|conduis|go)/.test(t)) {
+    const start = /(lance|demarre|go\b|guide|emmene|amene|conduis)/.test(t);
+    const r = await AI.navigate({ destination: place, arrive_by: time, start_guidance: start });
+    if (!r.ok) { aiSay(r.error, 'ai', r.error); return; }
+    const late = r.late_minutes_if_leave_now;
+    aiSay(`Itinéraire vers <b>${esc(r.destination)}</b> : <b>${r.minutes} min</b>, ${r.km} km${r.traffic_delay_min ? `, ${r.traffic_delay_min} min de trafic` : ''}${r.jams ? `, ${r.jams} bouchon${r.jams > 1 ? 's' : ''} sur le trajet le plus rapide` : ''}.${r.leave_at && !late ? ` Pour arriver à ${time}, partez à <b>${r.leave_at}</b>.` : ''}${late > 0 ? ` <b>Vous serez en retard d’environ ${late} min</b> : partez maintenant et prévenez.` : ''}${r.guidance_started ? ' Guidage lancé.' : ' Dites « lance le guidage » ou touchez Démarrer.'}`,
+      'ai', `${r.minutes} minutes vers ${r.destination}.${late > 0 ? ` Vous serez en retard de ${late} minutes.` : ''}`);
+    return;
+  }
+  if (/(lance|demarre).*(guidage|navigation)/.test(t)) { if (S.routes.length) { $('#aiPanel').hidden = true; startNav(); aiSay('Guidage lancé.'); } else aiSay('Dites-moi d’abord où aller.'); return; }
+  aiSay(S.set.aiKey ? 'Je n’ai pas compris.' : 'Je comprends les demandes de trajet, de réveil, de trafic, de signalement et de ponctualité. Essayez : « Emmène-moi au Plateau », « Réveille-moi demain pour être au travail à 8 h », « Comment est le trafic ? ». Pour tout comprendre, ajoutez une clé Claude dans Réglages.', 'ai');
+}
+// ---- Mode avancé : Claude pilote l'appli avec des outils ----
+let aiClient = null, aiHistory = [];
+function loadClaudeSDK() { return window.Anthropic ? Promise.resolve() : new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'vendor/anthropic-sdk.js'; sc.onload = ok; sc.onerror = () => ko(new Error('SDK indisponible')); document.head.appendChild(sc); }); }
+const strictObj = (props, req) => ({ type: 'object', properties: props, required: req, additionalProperties: false });
+const CLAUDE_TOOLS = [
+  { name: 'navigate', description: 'Calcule l’itinéraire le plus rapide (trafic en direct) vers une destination et l’affiche ; peut fixer l’heure d’arrivée voulue et lancer le guidage vocal.', input_schema: { type: 'object', properties: { destination: { type: 'string', description: 'Nom du lieu, adresse, ou « maison » / « travail »' }, arrive_by: { type: 'string', description: 'Heure d’arrivée voulue HH:MM (24 h)' }, start_guidance: { type: 'boolean' } }, required: ['destination'] } },
+  { name: 'set_alarm', description: 'Programme un réveil de départ : Ponctuel calcule l’heure de départ avec le trafic prévu puis en direct, et sonne quand il faut partir.', input_schema: { type: 'object', properties: { destination: { type: 'string' }, arrive_time: { type: 'string', description: 'HH:MM (24 h)' }, date: { type: 'string', description: 'AAAA-MM-JJ, pour un réveil ponctuel' }, days: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 6 }, description: 'Jours de répétition, 0 = dimanche' }, prep_minutes: { type: 'integer', description: 'Pré-alerte en minutes (défaut 15)' } }, required: ['destination', 'arrive_time'] } },
+  { name: 'travel_time', description: 'Temps de trajet actuel depuis la position de l’utilisateur vers une destination, avec le trafic.', input_schema: { type: 'object', properties: { destination: { type: 'string' } }, required: ['destination'] } },
+  { name: 'traffic_on_route', description: 'Bouchons et retard sur l’itinéraire affiché.', input_schema: { type: 'object', properties: {} } },
+  { name: 'report', description: 'Signale un incident à la position actuelle.', input_schema: { type: 'object', properties: { type: { type: 'string', enum: ['bouchon', 'accident', 'police', 'danger', 'route fermee', 'inondation'] } }, required: ['type'] } },
+  { name: 'punctuality', description: 'Statistiques de ponctualité et habitudes de l’utilisateur.', input_schema: { type: 'object', properties: {} } },
+  { name: 'places', description: 'Lieux mémorisés, destinations récentes et réveils.', input_schema: { type: 'object', properties: {} } },
+  { name: 'stop_guidance', description: 'Arrête le guidage en cours.', input_schema: { type: 'object', properties: {} } },
+  { name: 'share_eta', description: 'Partage l’heure d’arrivée prévue (pendant le guidage).', input_schema: { type: 'object', properties: {} } }
+];
+async function claudeBrain(text) {
+  await loadClaudeSDK();
+  aiClient = aiClient || new window.Anthropic({ apiKey: S.set.aiKey, dangerouslyAllowBrowser: true });
+  const now = new Date();
+  const system = `Tu es Ponctuel IA, le copilote d’une appli de navigation anti-retard utilisée à Abidjan (Côte d’Ivoire). Tu réponds en français, en une à trois phrases courtes, chaleureuses et concrètes, faciles à écouter en conduisant. Tu utilises les outils pour agir dans l’appli au lieu de décrire ce qu’il faudrait faire. Si l’utilisateur doit être quelque part à une heure donnée, calcule et annonce l’heure de départ. N’invente jamais un temps de trajet : appelle un outil. Contexte : nous sommes le ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, il est ${fmtTime(now)}. Marge de sécurité de l’utilisateur : ${S.set.buffer} min. ${S.nav ? `Guidage en cours vers ${S.B?.name}.` : S.B ? `Destination affichée : ${S.B.name}.` : ''}`;
+  aiHistory.push({ role: 'user', content: text });
+  for (let i = 0; i < 6; i++) {
+    const res = await aiClient.beta.messages.create({ model: 'claude-opus-5-5', max_tokens: 8000, system, tools: CLAUDE_TOOLS, messages: aiHistory,
+      output_config: { effort: 'low' }, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+    aiHistory.push({ role: 'assistant', content: res.content });
+    if (res.stop_reason === 'refusal') { aiSay('Je ne peux pas répondre à cette demande.', 'ai'); return; }
+    const uses = res.content.filter(b => b.type === 'tool_use');
+    const said = res.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!uses.length || res.stop_reason === 'end_turn') { if (said) aiSay(esc(said).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'), 'ai', said.replace(/\*\*/g, '')); return; }
+    if (said) aiSay(esc(said), 'ai');
+    const results = [];
+    for (const u of uses) {
+      let out; try { out = await (AI[u.name] ? AI[u.name](u.input || {}) : { ok: false, error: 'Outil inconnu' }); } catch (e) { out = { ok: false, error: String(e.message || e) }; }
+      results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out), is_error: out?.ok === false });
+    }
+    aiHistory.push({ role: 'user', content: results });
+  }
+}
+async function aiAsk(text) {
+  text = (text || '').trim(); if (!text) return;
+  aiSay(esc(text), 'me'); $('#aiIn').value = ''; aiThinking(true);
+  try {
+    if (S.set.aiKey) {
+      try { await claudeBrain(text); }
+      catch (e) {
+        const A = window.Anthropic, msg = A && e instanceof A.AuthenticationError ? 'Clé Claude refusée : vérifiez-la dans Réglages.' : A && e instanceof A.RateLimitError ? 'Claude est très sollicité : réessayez dans un instant.' : A && e instanceof A.APIConnectionError ? 'Pas de connexion à Claude : je réponds en mode local.' : 'Claude indisponible : je réponds en mode local.';
+        aiHistory = []; // repart sur une conversation propre
+        aiSay(msg, 'ai'); await localBrain(text);
+      }
+    } else await localBrain(text);
+  } finally { aiThinking(false); }
+}
+// ---- Voix ----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function micToggle() {
+  if (!SR) { toast('La dictée vocale n’est pas disponible dans ce navigateur. Utilisez le micro du clavier.', 4000, 'mic'); $('#aiIn').focus(); return; }
+  if (rec) { rec.stop(); return; }
+  rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = false;
+  let finalTxt = ''; $('#aiMic').classList.add('on'); speechSynthesis?.cancel?.();
+  rec.onresult = e => { let it = ''; for (const r of e.results) { if (r.isFinal) finalTxt = r[0].transcript; else it += r[0].transcript; } $('#aiIn').value = finalTxt || it; };
+  rec.onerror = e => { if (e.error === 'not-allowed') toast('Autorisez le micro pour parler à Ponctuel IA.', 4000, 'mic'); };
+  rec.onend = () => { $('#aiMic').classList.remove('on'); rec = null; if (finalTxt) aiAsk(finalTxt); };
+  try { rec.start(); } catch { rec = null; $('#aiMic').classList.remove('on'); }
+}
+// ---- Panneau ----
+const AI_CHIPS = ['Briefing du jour', 'Je dois être à la BHCI à 7h30', 'Réveille-moi demain pour être au travail à 8h', 'Comment est le trafic ?', 'Combien de temps pour aller à la maison ?', 'Suis-je souvent en retard ?', 'Signale un bouchon'];
+function openAI() {
+  const p = $('#aiPanel'); p.hidden = false;
+  $('#aiMode').textContent = S.set.aiKey ? 'Propulsé par Claude · comprend tout' : 'Copilote local · ajoutez une clé Claude pour le mode avancé';
+  if (!aiLog().children.length) { aiSay(briefing(), 'ai card'); aiSay('Bonjour ! Dites-moi où vous devez être et à quelle heure : je calcule quand partir, par où passer, et je peux vous réveiller au bon moment.', 'ai'); }
+  $('#aiChips').innerHTML = AI_CHIPS.map(c => `<button type="button">${esc(c)}</button>`).join('');
+  $('#aiChips').querySelectorAll('button').forEach(b => b.onclick = () => aiAsk(b.textContent));
+  injectIcons(p);
+}
+$('#bAI').onclick = openAI;
+$('#aiClose').onclick = () => { $('#aiPanel').hidden = true; rec?.stop(); };
+$('#aiMic').onclick = micToggle;
+$('#aiForm').onsubmit = e => { e.preventDefault(); aiAsk($('#aiIn').value); };
+injectIcons();
