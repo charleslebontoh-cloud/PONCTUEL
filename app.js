@@ -265,8 +265,18 @@ async function applyBase() {
   map.setStyle(st, { diff: false });
 }
 const splashT0 = Date.now();
-const hideSplash = () => { if (Date.now() - splashT0 < 1800) { setTimeout(hideSplash, 1800 - (Date.now() - splashT0)); return; } const sp = $('#splash'); if (sp && !sp.classList.contains('out')) { sp.classList.add('out'); setTimeout(() => sp.remove(), 600); } };
-map.once('idle', hideSplash); setTimeout(hideSplash, 2200);
+// Ouverture : la voiture traverse le pont (vidéo), puis fondu vers le logo complet ; « Passer » ou un toucher ferment
+let splashMin = 1800, splashForce = false;
+(() => { const v = document.getElementById('splashVid'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) { v?.remove(); return; }
+  let faded = false;
+  const start = () => { if (v.classList.contains('on') || faded) return; v.classList.add('on'); $('#splash').classList.add('vid'); splashMin = 5200; };
+  v.addEventListener('playing', start, { once: true }); if (!v.paused && v.readyState > 2) start();
+  v.addEventListener('timeupdate', () => { if (!faded && v.currentTime >= 3.9) { faded = true; v.classList.remove('on'); } });
+  v.addEventListener('error', () => v.remove());
+  v.play?.().catch(() => { }); })();
+document.getElementById('splash')?.addEventListener('click', () => { splashForce = true; hideSplash(); });
+const hideSplash = () => { if (!splashForce && Date.now() - splashT0 < splashMin) { setTimeout(hideSplash, splashMin - (Date.now() - splashT0)); return; } const sp = $('#splash'); if (sp && !sp.classList.contains('out')) { sp.classList.add('out'); setTimeout(() => sp.remove(), 600); } };
+map.once('idle', hideSplash); setTimeout(hideSplash, 2200); setTimeout(() => { splashForce = true; hideSplash(); }, 7000);
 applyBase();
 map.on('style.load', () => { addOverlays(); atmosphere(); });
 function atmosphere() {
@@ -1023,7 +1033,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 14 · logo doré</p>
+  <p class="empty" style="font-size:12px">Version 15 · ouverture animée</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
