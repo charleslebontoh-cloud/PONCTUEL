@@ -949,7 +949,14 @@ function navUpdate() {
   if (!n.movedAt && S.speed > 8) n.movedAt = Date.now();
   let leftT = n.live ? Math.max(0, n.live.left * (left / Math.max(1, r.dist - n.live.done))) : r.dur * (left / r.dist);
   const tr = n.trace, span = tr.length > 1 ? (tr[tr.length - 1].t - tr[0].t) / 1000 : 0, pace = span > 120 ? (tr[tr.length - 1].d - tr[0].d) / span : null; // m/s observés sur ~5 min
-  if (pace != null && n.movedAt) { const obs = left / Math.max(pace, 1.2); leftT = leftT * .6 + Math.min(obs, leftT * 2.5) * .4; }
+  // allure réelle sur ~75 s, comparée à la vitesse normale de la route
+  const tw = n.trace.filter(x => Date.now() - x.t < 75000), spanW = tw.length > 1 ? (tw[tw.length - 1].t - tw[0].t) / 1000 : 0;
+  const paceK = spanW > 30 ? Math.max(0, (tw[tw.length - 1].d - tw[0].d) / spanW * 3.6) : null;
+  const freeK = r.free ? (r.dist / r.free) * 3.6 : 40, normK = r.dur ? (r.dist / r.dur) * 3.6 : freeK * .6;
+  n.paceK = paceK; n.freeK = freeK;
+  if (n.crawling && paceK != null) { // bouchon constaté : ~1,2 km à l'allure réelle, le reste à l'allure prévue
+    const jd = Math.min(left, 1200); leftT = jd / Math.max(paceK / 3.6, .8) + Math.max(0, left - jd) / (normK / 3.6);
+  } else if (pace != null && n.movedAt) { const obs = left / Math.max(pace, 1.2); leftT = leftT * .6 + Math.min(obs, leftT * 2.5) * .4; }
   const eta = new Date(Date.now() + leftT * 1000);
   $('#nEta').textContent = fmtTime(eta); $('#nLeft').textContent = fmtDur(leftT); $('#nKm').textContent = (left / 1000).toFixed(1).replace('.', ',');
   $('#nEtaBox').classList.toggle('late', !!(n.planned && eta.getTime() > n.planned));
@@ -973,9 +980,14 @@ function navUpdate() {
   if (Date.now() - (S.posT || 0) > 6000) S.speed = 0; // plus de point GPS : arrêté
   // allure réelle sur 90 s (plus fiable que la vitesse instantanée en bouchon : avance-arrêt)
   const t90 = (n.trace || []).filter(x => Date.now() - x.t < 90000), pace90 = t90.length > 1 && t90[t90.length - 1].t - t90[0].t > 45000 ? (t90[t90.length - 1].d - t90[0].d) / ((t90[t90.length - 1].t - t90[0].t) / 1000) * 3.6 : null;
-  const slowNow = S.speed < 10 || (pace90 != null && pace90 < 12);
-  if (slowNow && (n.movedAt || Date.now() - n.start > 40000)) n.slowSince = n.slowSince || Date.now(); else if (!slowNow) { n.slowSince = 0; n.crawlAsked = 0; }
-  const slowFor = n.slowSince ? (Date.now() - n.slowSince) / 1000 : 0, crawling = slowFor > 30;
+  const pk = n.paceK ?? pace90, ratioK = pk != null ? pk / Math.max(n.freeK || 40, 15) : null;
+  const slowNow = pk != null ? (ratioK < .45 || pk < 15) : S.speed < 10;
+  const clearNow = pk != null ? (ratioK > .65 && pk >= 20) : S.speed > 25;
+  if (slowNow && (n.movedAt || Date.now() - n.start > 30000)) n.slowSince = n.slowSince || Date.now();
+  else if (clearNow) { n.slowSince = 0; n.crawlAsked = 0; }
+  const slowFor = n.slowSince ? (Date.now() - n.slowSince) / 1000 : 0, crawling = slowFor > 25;
+  if (crawling && !n.crawling) { speak(`Ralentissement détecté.`); navigator.vibrate?.(120); }
+  n.crawling = crawling;
   const jamLeft = r.jams.filter(j => j.startOff + (j.len || 0) > done).reduce((t, j) => t + (j.delay || 0), 0);
   const lateMin = n.planned ? Math.round((eta.getTime() - n.planned) / 60000) : null;
   const densePct = r.free ? (r.dur - r.free) / r.free : 0;
@@ -991,7 +1003,7 @@ function navUpdate() {
   }
   if (ahead && !(probe && probe.off < ahead.startOff)) { lvl = ahead.mag >= 3 ? 'jam' : 'slow'; msg = `${ahead.mag >= 3 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`; }
   if (inJam) { lvl = 'jam'; msg = `Dans le bouchon · encore ${fmtKm(Math.max(0, inJam.startOff + (inJam.len || 0) - done))}${inJam.delay ? ' · +' + fmtDur(inJam.delay) : ''}`; }
-  else if (crawling) { lvl = slowFor > 120 ? 'jam' : 'slow'; msg = slowFor > 120 ? `Bouchon détecté · arrêt depuis ${Math.round(slowFor / 60)} min${pace90 != null ? ' · ' + Math.round(pace90) + ' km/h' : ''}` : `Ralentissement · vous roulez au pas`; }
+  else if (crawling) { const spk = Math.round(pk ?? S.speed); lvl = slowFor > 90 || (ratioK != null && ratioK < .25) ? 'jam' : 'slow'; msg = `${lvl === 'jam' ? 'Bouchon' : 'Ralentissement'} · ${spk} km/h au lieu de ${Math.round(n.freeK || 40)}${slowFor > 60 ? ' · depuis ' + Math.round(slowFor / 60) + ' min' : ''}`; }
   if (lateMin > 0) msg += ` · retard prévu +${lateMin} min`;
   const stat = $('#nStatus'); stat.className = 'nstatus ' + lvl; stat.innerHTML = ic(lvl === 'ok' ? 'check' : lvl === 'jam' ? 'alert' : 'jam') + '<span></span>'; stat.lastChild.textContent = msg;
   if (ahead && !n.spoken['j' + ahead.startOff] && ahead.startOff - done < 1500) { n.spoken['j' + ahead.startOff] = 1; speak(`Attention, ${ahead.mag >= 3 ? 'bouchon' : 'ralentissement'} dans ${fmtKm(ahead.startOff - done)}.`); }
@@ -1120,7 +1132,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 23 · contournement des bouchons</p>
+  <p class="empty" style="font-size:12px">Version 24 · bouchons détectés à votre vitesse</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
