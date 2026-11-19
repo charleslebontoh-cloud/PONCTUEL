@@ -1,5 +1,5 @@
 // Met en cache l'application pour un démarrage instantané (cartes et trafic restent en ligne).
-const V='ponctuel-v19', SHELL=['./','index.html','app.js?v=19','manifest.json','vendor/maplibre-gl.js','vendor/maplibre-gl.css','media/icon-180.png','media/icon-192.png','media/icon-64.png','media/logo.jpg','media/intro-poster.jpg','media/kaiyi.png','media/car3d.png'];
+const V='ponctuel-v20', SHELL=['./','index.html','app.js?v=20','manifest.json','vendor/maplibre-gl.js','vendor/maplibre-gl.css','media/icon-180.png','media/icon-192.png','media/icon-64.png','media/logo.jpg','media/intro-poster.jpg','media/kaiyi.png','media/car3d.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>!k.startsWith(V)).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',e=>{

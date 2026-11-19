@@ -669,7 +669,7 @@ async function calc(opts = {}) {
     if (S.set.key) { try { routes = await osrmRoutes(a, b); if (!opts.silent) toast('Trafic TomTom indisponible : itinéraire sans trafic en direct.'); } catch (e2) { console.warn(e2); } }
   }
   if (!routes?.length) { if (!opts.silent) $('#pane').innerHTML = '<p class="empty">Impossible de calculer l’itinéraire. Vérifiez la connexion internet, puis réessayez.</p>'; return; }
-  routes.forEach(r => { applyPersonal(r); r.score = r.dur + r.jams.reduce((s, j) => s + (j.mag >= 3 ? 60 : 0), 0); });
+  routes.forEach(r => { applyPersonal(r); smartEta(r); r.score = r.dur + r.jams.reduce((s, j) => s + (j.mag >= 3 ? 60 : 0), 0); });
   routes.sort((x, y) => x.score - y.score); routes[0].best = true;
   if (opts.silent) return routes;
   S.routes = routes; S.sel = 0; S.from = a; S.updatedAt = new Date();
@@ -704,7 +704,7 @@ async function tomtomRoutes(a, b) {
     const steps = (r.guidance?.instructions || []).filter(i => i.message).map(i => ({ text: i.message.replace(/<[^>]+>/g, ''), at: [i.point.latitude, i.point.longitude], off: i.routeOffsetInMeters, dir: dirFromTomTom(i.maneuver, i.message) }));
     const sm = r.summary;
     return { coords, cum, dist: sm.lengthInMeters, dur: sm.travelTimeInSeconds, free: sm.noTrafficTravelTimeInSeconds ?? sm.travelTimeInSeconds - (sm.trafficDelayInSeconds || 0),
-      delay: sm.trafficDelayInSeconds || 0, jams, steps, live: true };
+      hist: sm.historicTrafficTravelTimeInSeconds || 0, delay: sm.trafficDelayInSeconds || 0, jams, steps, live: true };
   });
 }
 async function osrmRoutes(a, b) {
@@ -718,7 +718,7 @@ async function osrmRoutes(a, b) {
       let best = idx, bd = Infinity; for (let i = idx; i < Math.min(coords.length, idx + 400); i++) { const d = hav(coords[i], at); if (d < bd) { bd = d; best = i; } }
       idx = best; return { text: osrmText(s), at, off: cum[best], dir: dirFromOsrm(s) };
     });
-    return { coords, cum, dist: r.distance, dur: r.duration * 1.35, free: r.duration, delay: r.duration * 0.35, jams: [], steps, live: false };
+    return { coords, cum, dist: r.distance, dur: r.duration, free: r.duration, delay: 0, jams: [], steps, live: false };
   });
 }
 const DIR = { left: 'à gauche', right: 'à droite', 'slight left': 'légèrement à gauche', 'slight right': 'légèrement à droite', 'sharp left': 'franchement à gauche', 'sharp right': 'franchement à droite', straight: 'tout droit', uturn: 'demi-tour' };
@@ -852,7 +852,7 @@ $('#satZoom').onclick = () => { const j = satList()[S.satIdx]; if (j) { S.follow
 /* ================= Planificateur « arriver à l'heure » ================= */
 const arriveIn = $('#arriveAt');
 arriveIn.value = store.get('arrive', '');
-arriveIn.onchange = () => { store.set('arrive', arriveIn.value); if (arriveIn.value && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission(); if (S.routes.length) render(); };
+arriveIn.onchange = () => { store.set('arrive', arriveIn.value); store.set('arriveSetAt', Date.now()); if (arriveIn.value && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission(); if (S.routes.length) render(); };
 function targetDate() {
   if (!arriveIn.value) return null;
   const [h, m] = arriveIn.value.split(':').map(Number), d = new Date(); d.setHours(h, m, 0, 0);
@@ -885,7 +885,7 @@ let wakeLock = null;
 async function startNav() {
   const r = S.routes[S.sel]; if (!r) return;
   startGeo();
-  S.nav = { r, start: Date.now(), planned: targetDate()?.getTime() || null, spoken: {}, off: 0, lastCheck: Date.now(), done: 0, idx: 0 };
+  S.nav = { pred: r.dur, predAt: new Date(), r, start: Date.now(), planned: targetDate()?.getTime() || null, spoken: {}, off: 0, lastCheck: Date.now(), done: 0, idx: 0 };
   S.compassMode = 'heading'; meMode = ''; meLook(); refreshCompass();
   for (const id of ['#top', '#sheet', '#sat', '#aiPanel']) $(id).hidden = true; $('#bReport').hidden = true; $('#nTray').hidden = true; muteIcon();
   document.body.classList.add('navmode'); enterFullscreen();
@@ -899,6 +899,8 @@ async function startNav() {
 }
 function stopNav(arrived) {
   const n = S.nav; if (!n) return;
+  if (arrived && n.pred && n.done > n.r.dist * .7) learnEta(n);
+  if (arrived) { arriveIn.value = ''; store.set('arrive', ''); }
   if (arrived || n.done > 500) {
     const end = Date.now(), lateMin = n.planned ? Math.round((end - n.planned) / 60000) : null;
     S.trips.unshift({ start: n.start, end, toName: S.B?.name || '', planned: n.planned, lateMin, dist: Math.round(n.done) });
@@ -929,7 +931,13 @@ function navUpdate() {
   const a0 = r.coords[best], a1 = r.coords[Math.min(best + 1, r.coords.length - 1)];
   const snapped = bd < 40 ? [a0[0] + (a1[0] - a0[0]) * bt, a0[1] + (a1[1] - a0[1]) * bt] : p;
   if (bd < 40) { anim.to = snapped; if (a0 !== a1 && S.speed < 25) { S.heading = bearingOf(a0, a1); anim.h1 = S.heading; } }
-  const left = r.dist - done, leftT = r.dur * (left / r.dist), eta = new Date(Date.now() + leftT * 1000);
+  const left = r.dist - done;
+  n.trace = (n.trace || []).filter(x => Date.now() - x.t < 6 * 60000); n.trace.push({ t: Date.now(), d: done });
+  if (!n.movedAt && S.speed > 8) n.movedAt = Date.now();
+  let leftT = n.live ? Math.max(0, n.live.left * (left / Math.max(1, r.dist - n.live.done))) : r.dur * (left / r.dist);
+  const tr = n.trace, span = tr.length > 1 ? (tr[tr.length - 1].t - tr[0].t) / 1000 : 0, pace = span > 120 ? (tr[tr.length - 1].d - tr[0].d) / span : null; // m/s observés sur ~5 min
+  if (pace != null && n.movedAt) { const obs = left / Math.max(pace, 1.2); leftT = leftT * .6 + Math.min(obs, leftT * 2.5) * .4; }
+  const eta = new Date(Date.now() + leftT * 1000);
   $('#nEta').textContent = fmtTime(eta); $('#nLeft').textContent = fmtDur(leftT); $('#nKm').textContent = (left / 1000).toFixed(1).replace('.', ',');
   $('#nEtaBox').classList.toggle('late', !!(n.planned && eta.getTime() > n.planned));
   $('#nProg').style.width = Math.min(100, done / r.dist * 100).toFixed(1) + '%';
@@ -975,6 +983,8 @@ async function betterRoute(curLeft) {
   const rs = await calc({ silent: true, from: { lat: S.pos[0], lng: S.pos[1] } });
   if (!rs?.length || !S.nav) return;
   const gain = curLeft - rs[0].dur;
+  const same = rs.find(x => Math.abs(x.dist - (S.nav.r.dist - S.nav.done)) < Math.max(400, x.dist * .08)) || rs[0];
+  S.nav.live = { left: same.dur, done: S.nav.done, at: Date.now() }; // temps restant rafraîchi avec le trafic actuel
   if (gain >= 180) { S.routes = rs; S.sel = 0; S.nav.r = rs[0]; S.nav.idx = 0; S.nav.spoken = {}; drawRoutes(true); speak(`Itinéraire plus rapide trouvé. Vous gagnez ${Math.round(gain / 60)} minutes.`); toast(`Nouvel itinéraire : −${fmtDur(gain)}`); }
 }
 let voiceFr = null;
@@ -1031,7 +1041,7 @@ function tripHtml() {
   const jl = satList();
   const jams = jl.length ? `<h3>Points noirs · vue satellite</h3>` + jl.map((j, i) => `<button class="jam-item" data-j="${i}"><i class="${j.mag >= 3 ? '' : 'mod'}"></i><div><b>${j.dest ? 'Autour de la destination' : j.mag >= 3 ? 'Bouchon' : 'Ralentissement'}${j.src === 'perso' ? ' (habituel)' : ''}</b><small>${[j.speed != null ? Math.round(j.speed) + ' km/h' : '', j.delay ? '+' + fmtDur(j.delay) : '', j.startOff != null && !j.dest ? 'à ' + fmtKm(j.startOff) : ''].filter(Boolean).join(' · ')}</small></div><span>Voir ${ic('chevR')}</span></button>`).join('') : '';
   return plan + cards + `<div class="btns"><button class="btn primary wide" id="startNav">${ic('go')}Démarrer le guidage</button></div><div class="btns"><button class="btn wide" id="alFromTrip">${ic('bell')}Programmer un réveil pour ce trajet</button></div>` +
-    `<p class="empty" style="font-size:12px;text-align:center">${S.routes[0].live ? 'Trafic en direct' : 'Estimation'} · actualisé à ${fmtTime(S.updatedAt || new Date())}</p>` + jams +
+    `<p class="empty" style="font-size:12px;text-align:center">Estimation Ponctuel : ${esc(r.etaWhy || 'trafic')}${r.rawDur && Math.abs(r.rawDur - r.dur) > 90 ? ` (trafic TomTom seul : ${fmtDur(r.rawDur)})` : ''} · actualisé à ${fmtTime(S.updatedAt || new Date())}</p>` + jams +
     (S.B ? `<div class="btns"><button class="btn" id="saveB">${ic('star')}Mémoriser « ${esc(S.B.name).slice(0, 28)} »</button></div>` : '');
 }
 function placesHtml() {
@@ -1081,7 +1091,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 19 · mode Réel 3D</p>
+  <p class="empty" style="font-size:12px">Version 20 · estimation intelligente</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1291,10 +1301,10 @@ async function routeTime(o, d, arriveAt) {
     const q = `/${o.lat},${o.lng}:${d.lat},${d.lng}/json?key=${k}&traffic=true&routeType=fastest&travelMode=car${avoid}` + (arriveAt ? `&arriveAt=${encodeURIComponent(arriveAt.toISOString().slice(0, 19) + 'Z')}` : '&departAt=now');
     for (const base of S.set.orbis ? ['maps/orbis/routing/calculateRoute', 'routing/1/calculateRoute'] : ['routing/1/calculateRoute', 'maps/orbis/routing/calculateRoute']) {
       try { const j = await getJSON(`https://api.tomtom.com/${base}${q}${base.includes('orbis') ? '&apiVersion=2' : ''}`, 15000); const sm = j.routes?.[0]?.summary;
-        if (sm) return { dur: sm.travelTimeInSeconds, delay: sm.trafficDelayInSeconds || 0, dist: sm.lengthInMeters, src: arriveAt ? 'prévu' : 'direct' }; } catch (e) { console.warn('réveil', e.message); }
+        if (sm) { const rr = { dur: sm.travelTimeInSeconds, free: sm.noTrafficTravelTimeInSeconds || sm.travelTimeInSeconds, hist: sm.historicTrafficTravelTimeInSeconds || 0, live: true, delay: sm.trafficDelayInSeconds || 0 }; smartEta(rr, arriveAt ? new Date(arriveAt - rr.dur * 1000 * 1.6) : new Date()); return { dur: rr.dur, delay: rr.delay, dist: sm.lengthInMeters, src: arriveAt ? 'prévu' : 'direct', model: rr.etaWhy }; } } catch (e) { console.warn('réveil', e.message); }
     }
   }
-  const r = (await osrmRoutes(o, d))[0]; applyPersonal(r);
+  const r = (await osrmRoutes(o, d))[0]; applyPersonal(r); smartEta(r, arriveAt ? new Date(arriveAt - r.free * 1000 * 1.8) : new Date());
   return { dur: r.dur, delay: r.delay, dist: r.dist, src: 'estimé' };
 }
 async function recalcAlarm(a, t) {
@@ -1726,3 +1736,39 @@ $('#nAI').onclick = () => { $('#nTray').hidden = true; openAI(); };
 // la barre d'options se referme toute seule
 document.addEventListener('pointerdown', e => { if (!$('#nTray').hidden && !e.target.closest('#navbar')) $('#nTray').hidden = true; }, { passive: true });
 injectIcons();
+
+
+/* ================= Moteur d'estimation Ponctuel =================
+   Le trafic « en direct » des fournisseurs est faible à Abidjan : seul, il annonce presque le temps « route vide ».
+   Estimation = le plus pessimiste de : trafic en direct, trafic historique, route vide × profil d'heure de pointe abidjanais,
+   puis corrigée par l'écart mesuré sur VOS trajets (apprentissage par tranche horaire). */
+let etaCalib = store.get('etaCalib', {});
+function rushFactor(d) {
+  const day = d.getDay(), h = d.getHours() + d.getMinutes() / 60;
+  if (day === 0) return h >= 10 && h < 20 ? 1.2 : 1.05;
+  if (day === 6) return h >= 9 && h < 20 ? 1.4 : 1.1;
+  if (h >= 6.5 && h < 9.5) return 1.95;       // pointe du matin
+  if (h >= 16.5 && h < 20) return 2.0;        // pointe du soir
+  if (h >= 11.5 && h < 14.5) return 1.45;     // mi-journée
+  if ((h >= 5.5 && h < 6.5) || (h >= 9.5 && h < 11.5) || (h >= 14.5 && h < 16.5) || (h >= 20 && h < 22)) return 1.35;
+  return 1.08;
+}
+const calibKey = d => ((d.getDay() === 0 || d.getDay() === 6) ? 'we' : 'wk') + '_' + d.getHours();
+function calibFor(d) { const c = etaCalib[calibKey(d)] || etaCalib[(d.getDay() === 0 || d.getDay() === 6 ? 'we' : 'wk') + '_all']; return c && c.n >= 2 ? Math.max(.7, Math.min(2.5, c.r)) : null; }
+function smartEta(r, when = new Date()) {
+  const free = r.free || r.dur, raw = r.dur, rush = free * rushFactor(when);
+  let est = Math.max(raw, r.hist || 0, rush), why = raw >= rush && raw >= (r.hist || 0) ? 'trafic en direct' : (r.hist || 0) > rush ? 'trafic habituel' : 'heure de pointe Abidjan';
+  const c = calibFor(when); if (c) { est *= c; why += ' + vos trajets'; }
+  r.rawDur = raw; r.dur = Math.round(est); r.delay = Math.max(0, r.dur - free); r.etaWhy = why;
+  return r;
+}
+function learnEta(n) {
+  const actual = (Date.now() - (n.movedAt || n.start)) / 1000; if (actual < 120) return;
+  const ratio = Math.max(.5, Math.min(3, actual / n.pred));
+  for (const k of [calibKey(n.predAt), (calibKey(n.predAt).split('_')[0]) + '_all']) {
+    const c = etaCalib[k] || { n: 0, r: 1 }; c.r = c.n ? c.r * .65 + ratio * .35 : ratio; c.n++; etaCalib[k] = c;
+  }
+  store.set('etaCalib', etaCalib);
+}
+// Une heure d'arrivée oubliée (déjà passée depuis plus de 30 min) ne doit pas fausser le « retard prévu »
+(() => { const t = targetDate(), setAt = store.get('arriveSetAt', 0); if (t && (t.getTime() < Date.now() - 20 * 60000 || Date.now() - setAt > 14 * 3600e3)) { arriveIn.value = ''; store.set('arrive', ''); } })();
