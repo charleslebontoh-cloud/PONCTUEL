@@ -961,12 +961,22 @@ function navUpdate() {
   // allure réelle sur 90 s (plus fiable que la vitesse instantanée en bouchon : avance-arrêt)
   const t90 = (n.trace || []).filter(x => Date.now() - x.t < 90000), pace90 = t90.length > 1 && t90[t90.length - 1].t - t90[0].t > 45000 ? (t90[t90.length - 1].d - t90[0].d) / ((t90[t90.length - 1].t - t90[0].t) / 1000) * 3.6 : null;
   const slowNow = S.speed < 10 || (pace90 != null && pace90 < 12);
-  if (slowNow && n.movedAt) n.slowSince = n.slowSince || Date.now(); else if (!slowNow) { n.slowSince = 0; n.crawlAsked = 0; }
+  if (slowNow && (n.movedAt || Date.now() - n.start > 40000)) n.slowSince = n.slowSince || Date.now(); else if (!slowNow) { n.slowSince = 0; n.crawlAsked = 0; }
   const slowFor = n.slowSince ? (Date.now() - n.slowSince) / 1000 : 0, crawling = slowFor > 30;
   const jamLeft = r.jams.filter(j => j.startOff + (j.len || 0) > done).reduce((t, j) => t + (j.delay || 0), 0);
   const lateMin = n.planned ? Math.round((eta.getTime() - n.planned) / 60000) : null;
-  let lvl = 'ok', msg = jamLeft > 60 ? `Trafic : +${fmtDur(jamLeft)} sur le reste du trajet` : 'Trafic fluide';
-  if (ahead) { lvl = ahead.mag >= 3 ? 'jam' : 'slow'; msg = `${ahead.mag >= 3 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`; }
+  const densePct = r.free ? (r.dur - r.free) / r.free : 0;
+  let lvl = 'ok', msg = jamLeft > 60 ? `Trafic : +${fmtDur(jamLeft)} sur le reste du trajet` : densePct > .35 ? `Trafic dense prévu · +${fmtDur((r.dur - r.free) * (left / r.dist))} (${esc(r.etaWhy || 'heure de pointe')})` : 'Aucun bouchon signalé devant';
+  if (densePct > .35 && !jamLeft) lvl = 'slow';
+  // sondes de trafic en direct sur la route devant (vitesse réelle mesurée par TomTom sur chaque tronçon)
+  const probe = (n.probes || []).filter(q => q.off > done + 30 && q.ratio < .6).sort((a, b) => a.off - b.off)[0];
+  if (probe && (!ahead || probe.off < ahead.startOff)) {
+    lvl = probe.ratio < .35 ? 'jam' : 'slow';
+    msg = `${probe.ratio < .35 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(probe.off - done)} · ${Math.round(probe.speed)} km/h (normal ${Math.round(probe.free)})`;
+    const k = 'p' + Math.round(probe.off / 300);
+    if (!n.spoken[k] && probe.off - done < 1800) { n.spoken[k] = 1; speak(`Attention, ${probe.ratio < .35 ? 'bouchon' : 'ralentissement'} dans ${fmtKm(probe.off - done)}.`); navigator.vibrate?.([120, 80, 120]); }
+  }
+  if (ahead && !(probe && probe.off < ahead.startOff)) { lvl = ahead.mag >= 3 ? 'jam' : 'slow'; msg = `${ahead.mag >= 3 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`; }
   if (inJam) { lvl = 'jam'; msg = `Dans le bouchon · encore ${fmtKm(Math.max(0, inJam.startOff + (inJam.len || 0) - done))}${inJam.delay ? ' · +' + fmtDur(inJam.delay) : ''}`; }
   else if (crawling) { lvl = slowFor > 120 ? 'jam' : 'slow'; msg = slowFor > 120 ? `Bouchon détecté · arrêt depuis ${Math.round(slowFor / 60)} min${pace90 != null ? ' · ' + Math.round(pace90) + ' km/h' : ''}` : `Ralentissement · vous roulez au pas`; }
   if (lateMin > 0) msg += ` · retard prévu +${lateMin} min`;
@@ -1099,7 +1109,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 21 · bouchons détectés sur place</p>
+  <p class="empty" style="font-size:12px">Version 22 · bouchons annoncés à l’avance</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1783,3 +1793,23 @@ function learnEta(n) {
 
 // L'iPhone n'envoie plus de position quand la voiture est arrêtée : on rafraîchit le guidage toutes les 3 s quand même
 setInterval(() => { if (S.nav && S.pos) navUpdate(); }, 3000);
+
+/* Sondes de trafic devant : toutes les 60 s (30 s au pas), on mesure la vitesse réelle TomTom à 4 points de la route devant */
+let probing = false;
+async function probeAhead() {
+  const n = S.nav; if (!n || !S.set.key || probing) return;
+  if (Date.now() - (n.probeAt || 0) < (n.slowSince ? 30000 : 60000)) return;
+  probing = true; n.probeAt = Date.now();
+  try {
+    const r = n.r, k = encodeURIComponent(S.set.key), offs = [250, 700, 1400, 2500, 4000].map(o => n.done + o).filter(o => o < r.dist - 50);
+    const pts = offs.map(o => { let i = r.cum.findIndex(c => c >= o); if (i < 0) i = r.coords.length - 1; return { off: o, p: r.coords[i] }; });
+    const out = await Promise.all(pts.map(async q => {
+      try { const j = await getJSON(`https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/16/json?point=${q.p[0]},${q.p[1]}&unit=KMPH&key=${k}`, 8000);
+        const f = j.flowSegmentData; if (!f?.freeFlowSpeed) return null;
+        return { off: q.off, speed: f.currentSpeed, free: f.freeFlowSpeed, ratio: f.roadClosure ? 0 : f.currentSpeed / f.freeFlowSpeed, conf: f.confidence };
+      } catch { return null; }
+    }));
+    if (S.nav === n) n.probes = out.filter(Boolean);
+  } finally { probing = false; }
+}
+setInterval(probeAhead, 5000);
