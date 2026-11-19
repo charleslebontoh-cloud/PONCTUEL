@@ -835,7 +835,7 @@ setInterval(async () => { // trafic temps réel : itinéraires recalculés toute
 }, 120000);
 function notify(title, body) {
   toast(title + ' — ' + body, 8000); speak(title);
-  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(title, { body, icon: 'https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png', tag: 'ponctuel' })).catch(() => new Notification(title, { body })); } catch { }
+  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(title, { body, icon: 'https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png', tag: 'ponctuel' })).catch(() => new Notification(title, { body })); } catch { }
   navigator.vibrate?.([200, 100, 200]);
 }
 
@@ -1023,7 +1023,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 13 · nouveau logo</p>
+  <p class="empty" style="font-size:12px">Version 14 · logo doré</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1304,7 +1304,7 @@ function fireAlarm(a, kind) {
   const say = kind === 'pre' ? `Préparez-vous. Départ dans ${Math.max(1, Math.round((o.leave - Date.now()) / 60000))} minutes pour ${a.dest.name}.`
     : `Il est temps de partir pour ${a.dest.name}. Trajet de ${Math.round(o.dur / 60)} minutes${o.delay > 120 ? `, dont ${Math.round(o.delay / 60)} minutes de bouchons` : ''}.`;
   setTimeout(() => { const v = S.set.voice; S.set.voice = true; speak(say); S.set.voice = v; }, 2500);
-  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(kind === 'pre' ? 'Préparez-vous' : 'Partez maintenant', { body: say, icon: 'https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png', tag: 'ponctuel-alarm', requireInteraction: true })); } catch { }
+  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(kind === 'pre' ? 'Préparez-vous' : 'Partez maintenant', { body: say, icon: 'https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png', tag: 'ponctuel-alarm', requireInteraction: true })); } catch { }
   try { navigator.wakeLock?.request('screen')?.catch(() => { }); } catch { }
   injectIcons(box);
 }

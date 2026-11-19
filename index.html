@@ -8,9 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png" type="image/png">
+<link rel="icon" href="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png" type="image/png">
 <link rel="preload" as="image" href="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png">
-<link rel="apple-touch-icon" href="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png">
+<link rel="apple-touch-icon" href="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -391,6 +391,10 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 #splash .bar{margin-top:22px}
 .brand h1 .blogo{width:30px;height:30px;border-radius:9px;object-fit:cover;box-shadow:0 4px 12px rgba(0,0,0,.35),0 0 0 1px rgba(255,178,30,.35);display:block}
 
+
+.brand h1 .blogo{width:34px;height:34px;border-radius:10px;box-shadow:0 0 0 2px rgba(255,190,60,.9),0 0 16px rgba(255,178,30,.65),0 6px 14px rgba(0,0,0,.4);animation:glowlogo 3s ease-in-out infinite}
+@keyframes glowlogo{50%{box-shadow:0 0 0 2px rgba(255,210,90,1),0 0 26px rgba(255,178,30,.9),0 6px 14px rgba(0,0,0,.4)}}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
@@ -400,7 +404,7 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 <div id="map" role="application" aria-label="Carte"></div>
 
 <section id="top" class="glass">
-  <div class="brand"><h1><img class="blogo" src="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png" alt="">Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
+  <div class="brand"><h1><img class="blogo" src="https://cdn.creativeclaw.co/u/79610596/images/b5db3c3f-2c2f-4a7e-906e-690171b78027.png" alt="">Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
   <div class="fields">
     <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
     <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser"><span data-ic="swap"></span></button>
@@ -502,6 +506,6 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
