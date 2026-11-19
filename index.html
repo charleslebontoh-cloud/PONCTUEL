@@ -328,6 +328,57 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 #toast{display:flex;align-items:center;gap:8px;border-radius:14px;font-family:var(--body)}
 #toast .ic{width:18px;height:18px}
 
+
+/* ===== Réveil ===== */
+.tabs button{padding:8px 9px}
+#alarmPill{margin-left:auto;margin-right:8px;border:0;border-radius:999px;padding:5px 10px;font:700 11px var(--body);display:flex;gap:5px;align-items:center;background:rgba(61,155,255,.18);color:var(--text);max-width:52%;overflow:hidden}
+#alarmPill .ic{width:14px;height:14px;flex:none}
+#alarmPill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#alarmPill.unarmed{background:var(--signal);color:var(--signal-ink);animation:beat 1.4s ease-in-out infinite}
+.acard{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;background:var(--glass-2)}
+.acard.off{opacity:.55}
+.acard .t{font:800 30px/1 var(--display);letter-spacing:-.03em}
+.acard .d{font-weight:700}
+.acard .s{grid-column:1/3;color:var(--muted);font-size:13px;margin-top:4px}
+.acard .s b{color:var(--signal)}
+.acard .s .ic{display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:2px}
+.acard .row{grid-column:1/3;display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.acard .row .btn{padding:7px 10px;font-size:12px}
+.switch{appearance:none;width:46px;height:28px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;margin:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.3);transition:transform .2s}
+.switch:checked{background:var(--go)}.switch:checked::after{transform:translateX(18px)}
+.form{display:grid;gap:10px;background:var(--glass-2);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.form label{display:grid;gap:4px;font-weight:700;font-size:13px}
+.form select,.form input{background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font:600 15px var(--body);width:100%}
+.form .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.days{display:flex;gap:5px}
+.days button{flex:1;border:1px solid var(--line);background:transparent;border-radius:9px;padding:8px 0;font:700 12px var(--display)}
+.days button.on{background:var(--route);color:#fff;border-color:transparent}
+#alarm{position:fixed;inset:0;z-index:1500;display:grid;align-content:center;justify-items:center;gap:10px;text-align:center;color:#fff;
+  padding:24px max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));
+  background:radial-gradient(120% 70% at 50% 25%,#ff9a2e 0%,#e2531f 35%,#5a1320 75%,#1a0a14 100%);animation:rise .35s ease-out}
+#alarm.pre{background:radial-gradient(120% 70% at 50% 25%,#40a0ff 0%,#1e5fd0 40%,#0d1f4d 80%,#081024 100%)}
+#alarm .ring{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.16);box-shadow:0 0 0 0 rgba(255,255,255,.5);animation:ring2 1.4s infinite}
+#alarm .ring .ic{width:56px;height:56px;stroke-width:2;animation:shake .5s ease-in-out infinite}
+@keyframes ring2{70%{box-shadow:0 0 0 34px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+@keyframes shake{25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+#alarm small{font:800 13px var(--display);letter-spacing:.14em;opacity:.9}
+#alarm b{font:800 76px/1 var(--display);letter-spacing:-.04em}
+#alarm p{margin:0;font-size:17px;font-weight:600;max-width:34ch;opacity:.95}
+#alarm .alstats{display:flex;gap:10px;margin:6px 0 10px}
+#alarm .alstats div{background:rgba(0,0,0,.22);border-radius:14px;padding:8px 14px}
+#alarm .alstats b{display:block;font-size:22px;letter-spacing:-.02em}
+#alarm .alstats small{font:600 11px var(--body);letter-spacing:0;opacity:.8}
+#alarm .btn.primary{max-width:420px;background:#fff;color:#c2410c;box-shadow:0 12px 30px rgba(0,0,0,.35)}
+#alarm.pre .btn.primary{color:#1e5fd0}
+#alarm .btns{justify-content:center}
+#alarm .btns .btn{background:rgba(0,0,0,.25);color:#fff;border-color:rgba(255,255,255,.25)}
+#bedside{position:fixed;inset:0;z-index:1400;background:#000;color:#9fb3cc;display:grid;align-content:center;justify-items:center;gap:14px;text-align:center;padding:24px}
+#bedside b{font:700 96px/1 var(--display);color:#cfe0ff;letter-spacing:-.05em;opacity:.85}
+#bedside p{margin:0;font:600 16px var(--body);color:#ffb21e}
+#bedside small{max-width:34ch;opacity:.6}
+#bedside .btn{background:#111;color:#9fb3cc;border-color:#222;margin-top:10px}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
@@ -337,7 +388,7 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 <div id="map" role="application" aria-label="Carte"></div>
 
 <section id="top" class="glass">
-  <div class="brand"><h1><i></i>Ponctuel</h1><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
+  <div class="brand"><h1><i></i>Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
   <div class="fields">
     <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
     <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser"><span data-ic="swap"></span></button>
@@ -374,7 +425,8 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
   <nav class="tabs" role="tablist">
     <button data-tab="trip" class="on"><span data-ic="route"></span>Trajet</button>
     <button data-tab="places"><span data-ic="pin"></span>Lieux</button>
-    <button data-tab="stats"><span data-ic="stats"></span>Ponctualité</button>
+    <button data-tab="alarm"><span data-ic="bell"></span>Réveil</button>
+    <button data-tab="stats"><span data-ic="stats"></span>Stats</button>
     <button data-tab="settings"><span data-ic="sliders"></span>Réglages</button>
   </nav>
   <div id="pane"></div>
@@ -421,8 +473,23 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </section>
 <section id="arrival" class="sheet2 glass" hidden aria-label="Arrivée"></section>
 <canvas id="confetti" hidden></canvas>
+<section id="alarm" hidden role="alertdialog" aria-label="Réveil de départ">
+  <div class="ring"><span data-ic="bell"></span></div>
+  <small id="alKind">C’EST L’HEURE DE PARTIR</small>
+  <b class="num" id="alClock">06:52</b>
+  <p id="alMsg"></p>
+  <div class="alstats" id="alStats"></div>
+  <button class="btn primary wide" id="alGo"><span data-ic="go"></span>Lancer le guidage</button>
+  <div class="btns"><button class="btn" id="alSnooze"><span data-ic="clock"></span>Dans 5 min</button><button class="btn" id="alStop"><span data-ic="x"></span>Arrêter</button></div>
+</section>
+<section id="bedside" hidden aria-label="Mode chevet">
+  <b class="num" id="bsClock">00:00</b>
+  <p id="bsNext"></p>
+  <small>Laissez Ponctuel ouvert sur le chargeur : le trafic est recalculé en direct et l’alarme sonnera au bon moment.</small>
+  <button class="btn" id="bsExit"><span data-ic="x"></span>Quitter le mode chevet</button>
+</section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

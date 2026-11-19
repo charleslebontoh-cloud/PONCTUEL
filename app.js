@@ -80,6 +80,10 @@ const ICONS = {
   go: '<path d="M12 2l7 19-7-4-7 4z"/>', flag: '<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
   recent: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/><path d="M12 7v5l3 2"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -944,7 +948,7 @@ function syncSheet() {
 }
 function render() {
   const pane = $('#pane');
-  pane.innerHTML = curTab === 'trip' ? tripHtml() : curTab === 'places' ? placesHtml() : curTab === 'stats' ? statsHtml() : settingsHtml();
+  pane.innerHTML = curTab === 'trip' ? tripHtml() : curTab === 'places' ? placesHtml() : curTab === 'stats' ? statsHtml() : curTab === 'alarm' ? alarmHtml() : settingsHtml();
   bindPane(); requestAnimationFrame(syncSheet); if (typeof renderRecents === 'function') renderRecents();
 }
 function tripHtml() {
@@ -970,7 +974,7 @@ function tripHtml() {
   }).join('');
   const jl = satList();
   const jams = jl.length ? `<h3>Points noirs · vue satellite</h3>` + jl.map((j, i) => `<button class="jam-item" data-j="${i}"><i class="${j.mag >= 3 ? '' : 'mod'}"></i><div><b>${j.dest ? 'Autour de la destination' : j.mag >= 3 ? 'Bouchon' : 'Ralentissement'}${j.src === 'perso' ? ' (habituel)' : ''}</b><small>${[j.speed != null ? Math.round(j.speed) + ' km/h' : '', j.delay ? '+' + fmtDur(j.delay) : '', j.startOff != null && !j.dest ? 'à ' + fmtKm(j.startOff) : ''].filter(Boolean).join(' · ')}</small></div><span>Voir ${ic('chevR')}</span></button>`).join('') : '';
-  return plan + cards + `<div class="btns"><button class="btn primary wide" id="startNav">Démarrer le guidage</button></div>` +
+  return plan + cards + `<div class="btns"><button class="btn primary wide" id="startNav">${ic('go')}Démarrer le guidage</button></div><div class="btns"><button class="btn wide" id="alFromTrip">${ic('bell')}Programmer un réveil pour ce trajet</button></div>` +
     `<p class="empty" style="font-size:12px;text-align:center">${S.routes[0].live ? 'Trafic en direct' : 'Estimation'} · actualisé à ${fmtTime(S.updatedAt || new Date())}</p>` + jams +
     (S.B ? `<div class="btns"><button class="btn" id="saveB">${ic('star')}Mémoriser « ${esc(S.B.name).slice(0, 28)} »</button></div>` : '');
 }
@@ -1018,7 +1022,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 11 · design premium</p>
+  <p class="empty" style="font-size:12px">Version 12 · réveil de départ intelligent</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1028,6 +1032,7 @@ function bindPane() {
   pane.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { S.sel = +b.dataset.r; drawRoutes(true); render(); });
   pane.querySelectorAll('[data-j]').forEach(b => b.onclick = () => openSat(+b.dataset.j));
   $('#startNav') && ($('#startNav').onclick = startNav);
+  bindAlarmPane();
   $('#saveB') && ($('#saveB').onclick = () => {
     const b = S.B; if (S.places.some(p => hav([p.lat, p.lng], [b.lat, b.lng]) < 150)) { toast('Ce lieu est déjà mémorisé.'); return; }
     S.places.push({ id: 'p' + Date.now().toString(36), lat: b.lat, lng: b.lng, name: b.name, tag: '', visits: 0, hours: Array(24).fill(0), dows: Array(7).fill(0), mins: 0, last: 0 });
@@ -1192,3 +1197,223 @@ function confetti() {
 }
 renderRecents(); syncTheme();
 $('#sheet').addEventListener('transitionend', syncSheet); // recale les boutons une fois le panneau stabilisé
+
+
+/* ================= Réveil de départ intelligent =================
+   Pour chaque réveil : heure d'arrivée voulue → heure de départ recalculée
+   (trafic prévu TomTom à l'avance, trafic en direct dans la dernière heure, sinon historique perso),
+   alarme sonore + vocale au moment de partir, pré-alerte optionnelle, rappel calendrier de secours. */
+const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'], DAYS_FULL = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+let alarms = store.get('alarms', []);
+const saveAlarms = () => store.set('alarms', alarms);
+let draft = null; // formulaire en cours
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function nextTarget(a) {
+  const [h, m] = a.time.split(':').map(Number), now = Date.now();
+  if (!a.days?.length) { const [Y, M, D] = a.date.split('-').map(Number); const d = new Date(Y, M - 1, D, h, m); return d.getTime() > now - 20 * 60000 ? d : null; }
+  for (let i = 0; i < 8; i++) { const d = new Date(); d.setDate(d.getDate() + i); d.setHours(h, m, 0, 0); if (a.days.includes(d.getDay()) && d.getTime() > now - 20 * 60000) return d; }
+  return null;
+}
+function dayLabel(d) {
+  const t0 = new Date(); t0.setHours(0, 0, 0, 0); const diff = Math.round((new Date(d).setHours(0, 0, 0, 0) - t0) / 864e5);
+  return diff === 0 ? 'aujourd’hui' : diff === 1 ? 'demain' : d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+function alarmOrigin(a) {
+  const home = S.places.find(p => p.tag === 'home');
+  if (a.from === 'home' && home) return { lat: home.lat, lng: home.lng };
+  if (S.pos) return { lat: S.pos[0], lng: S.pos[1] };
+  return home ? { lat: home.lat, lng: home.lng } : null;
+}
+// Durée de trajet : TomTom (prévu à l'heure d'arrivée ou en direct), sinon OSRM + historique perso
+async function routeTime(o, d, arriveAt) {
+  if (S.set.key) {
+    const k = encodeURIComponent(S.set.key), avoid = [S.set.tolls && 'tollRoads', S.set.highways && 'motorways'].filter(Boolean).map(x => '&avoid=' + x).join('');
+    const q = `/${o.lat},${o.lng}:${d.lat},${d.lng}/json?key=${k}&traffic=true&routeType=fastest&travelMode=car${avoid}` + (arriveAt ? `&arriveAt=${encodeURIComponent(arriveAt.toISOString().slice(0, 19) + 'Z')}` : '&departAt=now');
+    for (const base of S.set.orbis ? ['maps/orbis/routing/calculateRoute', 'routing/1/calculateRoute'] : ['routing/1/calculateRoute', 'maps/orbis/routing/calculateRoute']) {
+      try { const j = await getJSON(`https://api.tomtom.com/${base}${q}${base.includes('orbis') ? '&apiVersion=2' : ''}`, 15000); const sm = j.routes?.[0]?.summary;
+        if (sm) return { dur: sm.travelTimeInSeconds, delay: sm.trafficDelayInSeconds || 0, dist: sm.lengthInMeters, src: arriveAt ? 'prévu' : 'direct' }; } catch (e) { console.warn('réveil', e.message); }
+    }
+  }
+  const r = (await osrmRoutes(o, d))[0]; applyPersonal(r);
+  return { dur: r.dur, delay: r.delay, dist: r.dist, src: 'estimé' };
+}
+async function recalcAlarm(a, t) {
+  const o = a.occ, org = alarmOrigin(a);
+  if (!org) { o.err = 'Position de départ inconnue : activez la localisation ou définissez « Maison » dans Lieux.'; return; }
+  const live = t - Date.now() < 75 * 60000;
+  try {
+    const r = await routeTime(org, a.dest, live ? null : t);
+    Object.assign(o, r, { err: null, calcAt: Date.now(), leave: t.getTime() - (r.dur + S.set.buffer * 60) * 1000 });
+  } catch (e) { o.err = 'Calcul impossible pour l’instant (réseau). Nouvel essai bientôt.'; o.calcAt = Date.now() - 4 * 60000; }
+}
+let alarmBusy = false;
+async function alarmTick() {
+  if (alarmBusy) return; alarmBusy = true;
+  try {
+    for (const a of alarms) {
+      if (!a.on) continue;
+      const t = nextTarget(a); if (!t) { if (!a.days?.length && a.occ?.main) a.on = false; continue; }
+      const key = t.toISOString(); if (a.occ?.key !== key) a.occ = { key };
+      const o = a.occ, until = (t - Date.now()) / 60000;
+      const every = until < 90 ? 3 : until < 240 ? 10 : 60;
+      if (!o.calcAt || Date.now() - o.calcAt > every * 60000) await recalcAlarm(a, t);
+      if (!o.leave) continue;
+      const now = Date.now();
+      if (a.prep > 0 && !o.pre && now >= o.leave - a.prep * 60000 && now < o.leave) { o.pre = true; fireAlarm(a, 'pre'); }
+      if (!o.main && (now >= o.leave || (o.snooze && now >= o.snooze))) { if (o.snooze && now >= o.snooze) o.snooze = null; o.main = true; fireAlarm(a, 'main'); }
+      if (o.snooze && now >= o.snooze) { o.snooze = null; fireAlarm(a, 'main'); }
+    }
+    saveAlarms(); refreshAlarmPill(); if (curTab === 'alarm' && !$('#sheet').hidden && !document.activeElement?.closest?.('.form')) render();
+  } finally { alarmBusy = false; }
+}
+setInterval(alarmTick, 20000); setTimeout(alarmTick, 3000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) alarmTick(); });
+
+// Son d'alarme : WAV généré (joue même téléphone en silencieux sur iPhone, contrairement au Web Audio)
+function alarmWav() {
+  const sr = 22050, secs = 2.4, n = sr * secs, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  const notes = [[0, 880], [.18, 1175], [.36, 1480], [.9, 880], [1.08, 1175], [1.26, 1480]];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr; let x = 0;
+    for (const [st, f] of notes) { const dt = t - st; if (dt >= 0 && dt < .16) x += Math.sin(2 * Math.PI * f * t) * Math.min(1, dt * 60) * Math.min(1, (.16 - dt) * 40) * .45 + Math.sin(4 * Math.PI * f * t) * .12 * Math.min(1, (.16 - dt) * 40); }
+    v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, x)) * 32767, true);
+  }
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+let alarmAudio = null, audioArmed = false;
+function armAudio() { // doit être appelé depuis un toucher : l'audio tourne en sourdine jusqu'à l'alarme
+  if (audioArmed) return;
+  try { alarmAudio = alarmAudio || new Audio(alarmWav()); alarmAudio.loop = true; alarmAudio.muted = true;
+    alarmAudio.play().then(() => { audioArmed = true; refreshAlarmPill(); }).catch(() => { }); } catch { }
+}
+document.addEventListener('pointerdown', () => { if (alarms.some(a => a.on)) armAudio(); }, { passive: true });
+let vibT = null;
+function fireAlarm(a, kind) {
+  const o = a.occ, t = new Date(a.occ.key), late = Math.round((Date.now() - o.leave) / 60000);
+  const box = $('#alarm'); box.classList.toggle('pre', kind === 'pre'); box.hidden = false; box.dataset.id = a.id;
+  $('#alKind').textContent = kind === 'pre' ? `PRÉPAREZ-VOUS · DÉPART DANS ${Math.max(1, Math.round((o.leave - Date.now()) / 60000))} MIN` : late > 2 ? `PARTEZ MAINTENANT · DÉJÀ ${late} MIN DE RETARD` : 'C’EST L’HEURE DE PARTIR';
+  $('#alClock').textContent = fmtTime(new Date());
+  $('#alMsg').textContent = `Pour arriver à ${a.time.replace(':', ' h ')} à ${a.dest.name}.`;
+  $('#alStats').innerHTML = `<div><b>${fmtDur(o.dur)}</b><small>de trajet</small></div><div><b>${o.delay > 60 ? '+' + fmtDur(o.delay) : 'fluide'}</b><small>trafic ${o.src}</small></div><div><b>${fmtTime(new Date(Date.now() + o.dur * 1000))}</b><small>arrivée</small></div>`;
+  if (alarmAudio) { alarmAudio.muted = false; alarmAudio.currentTime = 0; alarmAudio.play().catch(() => { }); }
+  clearInterval(vibT); navigator.vibrate?.([600, 300, 600]); vibT = setInterval(() => navigator.vibrate?.([600, 300, 600]), 2000);
+  const say = kind === 'pre' ? `Préparez-vous. Départ dans ${Math.max(1, Math.round((o.leave - Date.now()) / 60000))} minutes pour ${a.dest.name}.`
+    : `Il est temps de partir pour ${a.dest.name}. Trajet de ${Math.round(o.dur / 60)} minutes${o.delay > 120 ? `, dont ${Math.round(o.delay / 60)} minutes de bouchons` : ''}.`;
+  setTimeout(() => { const v = S.set.voice; S.set.voice = true; speak(say); S.set.voice = v; }, 2500);
+  try { if ('Notification' in window && Notification.permission === 'granted') navigator.serviceWorker?.ready.then(r => r.showNotification(kind === 'pre' ? 'Préparez-vous' : 'Partez maintenant', { body: say, icon: 'icon-192.png', tag: 'ponctuel-alarm', requireInteraction: true })); } catch { }
+  try { navigator.wakeLock?.request('screen')?.catch(() => { }); } catch { }
+  injectIcons(box);
+}
+function stopAlarmSound() { if (alarmAudio) { alarmAudio.muted = true; } clearInterval(vibT); navigator.vibrate?.(0); speechSynthesis?.cancel?.(); $('#alarm').hidden = true; }
+$('#alStop').onclick = () => stopAlarmSound();
+$('#alSnooze').onclick = () => { const a = alarms.find(x => x.id === $('#alarm').dataset.id); if (a?.occ) { a.occ.snooze = Date.now() + 5 * 60000; saveAlarms(); } stopAlarmSound(); toast('Je vous rappelle dans 5 minutes.', 2500, 'clock'); };
+$('#alGo').onclick = async () => {
+  const a = alarms.find(x => x.id === $('#alarm').dataset.id); stopAlarmSound(); if (!a) return;
+  arriveIn.value = a.time; store.set('arrive', a.time); setB({ ...a.dest }); S.A = null; $('#inA').value = '';
+  const rs = await calc(); if (rs?.length) startNav();
+};
+
+// Pastille dans la barre du haut : prochain départ
+function refreshAlarmPill() {
+  const pill = $('#alarmPill'); const next = alarms.filter(a => a.on && a.occ?.leave && nextTarget(a)).sort((x, y) => x.occ.leave - y.occ.leave)[0]
+    || alarms.find(a => a.on && nextTarget(a));
+  if (!next) { pill.hidden = true; return; }
+  pill.hidden = false; pill.classList.toggle('unarmed', !audioArmed);
+  pill.innerHTML = ic('bell') + `<span>${audioArmed ? (next.occ?.leave ? 'Départ ' + fmtTime(new Date(next.occ.leave)) : 'Réveil ' + next.time) : 'Touchez pour armer le réveil'}</span>`;
+}
+$('#alarmPill').onclick = () => { armAudio(); showTab('alarm'); };
+
+// Calendrier de secours (.ics) : sonne même appli fermée
+function icsFor(a) {
+  const t = nextTarget(a) || new Date(); const leave = new Date(a.occ?.leave || t.getTime() - 45 * 60000);
+  const f = d => d.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const by = a.days?.length ? `RRULE:FREQ=WEEKLY;BYDAY=${a.days.map(d => ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][d]).join(',')}\r\n` : '';
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ponctuel//FR', 'BEGIN:VEVENT', `UID:${a.id}@ponctuel`, `DTSTAMP:${f(new Date())}`, `DTSTART:${f(leave)}`, `DTEND:${f(t)}`,
+    `SUMMARY:Partir pour ${a.dest.name} (arrivée ${a.time})`, `LOCATION:${a.dest.name}`, `DESCRIPTION:Heure estimée par Ponctuel le ${new Date().toLocaleString('fr-FR')}. Ouvrez Ponctuel pour l’heure recalculée avec le trafic en direct.`,
+    by.trim(), 'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Partez maintenant', 'TRIGGER:PT0M', 'END:VALARM',
+    ...(a.prep > 0 ? ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Préparez-vous', `TRIGGER:-PT${a.prep}M`, 'END:VALARM'] : []), 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+}
+function openIcs(a) {
+  const url = URL.createObjectURL(new Blob([icsFor(a)], { type: 'text/calendar' }));
+  const l = document.createElement('a'); l.href = url; l.download = `ponctuel-${a.time.replace(':', 'h')}.ics`; document.body.appendChild(l); l.click(); l.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  toast('Ouvrez le fichier pour l’ajouter à votre calendrier.', 4000, 'cal');
+}
+
+// Mode chevet : écran noir, grande horloge, écran maintenu allumé
+let bsT = null, bsLock = null;
+async function bedside(on) {
+  $('#bedside').hidden = !on; clearInterval(bsT);
+  if (on) {
+    armAudio();
+    const upd = () => { $('#bsClock').textContent = fmtTime(new Date()); const a = alarms.filter(x => x.on && x.occ?.leave).sort((x, y) => x.occ.leave - y.occ.leave)[0];
+      $('#bsNext').textContent = a ? `Départ prévu ${fmtTime(new Date(a.occ.leave))} → ${a.dest.name} à ${a.time}` : 'Aucun réveil programmé'; };
+    upd(); bsT = setInterval(upd, 15000);
+    try { bsLock = await navigator.wakeLock?.request('screen'); } catch { }
+  } else { try { bsLock?.release(); } catch { } bsLock = null; }
+}
+$('#bsExit').onclick = () => bedside(false);
+
+// Onglet Réveil
+function destChoices() {
+  const out = [], seen = new Set(), add = (p, tag) => { if (!p) return; const k = Math.round(p.lat * 2000) + '_' + Math.round(p.lng * 2000); if (seen.has(k)) return; seen.add(k); out.push({ lat: p.lat, lng: p.lng, name: p.name, tag }); };
+  add(S.B, 'Destination actuelle');
+  S.places.filter(p => p.tag === 'work').forEach(p => add(p, 'Travail')); S.places.filter(p => p.tag === 'home').forEach(p => add(p, 'Maison'));
+  S.places.forEach(p => add(p, 'Lieu')); recents.forEach(p => add(p, 'Récent'));
+  return out;
+}
+function newDraft(dest) {
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  return { dest: dest || destChoices()[0] || null, time: arriveIn.value || '07:30', date: ymd(tm), days: [], prep: 15, from: S.places.some(p => p.tag === 'home') ? 'home' : 'gps' };
+}
+function alarmHtml() {
+  const list = alarms.map(a => {
+    const t = nextTarget(a), o = a.occ || {};
+    const when = a.days?.length ? a.days.slice().sort().map(d => DAYS_FULL[d]).join(' ') : t ? dayLabel(t) : 'passé';
+    const st = !a.on ? 'Désactivé' : !t ? 'Terminé' : o.err ? o.err : o.leave ? `Départ <b>${fmtTime(new Date(o.leave))}</b> · ${fmtDur(o.dur)} de route (${o.src}${o.delay > 60 ? `, +${fmtDur(o.delay)} de trafic` : ''}) · ${dayLabel(new Date(o.leave))}` : 'Calcul de l’heure de départ…';
+    return `<div class="acard ${a.on && t ? '' : 'off'}"><div><div class="t num">${a.time}</div><div class="d">${esc(a.dest.name)}</div></div>
+      <input type="checkbox" class="switch" data-aon="${a.id}" ${a.on ? 'checked' : ''} aria-label="Activer le réveil">
+      <div class="s">${ic('cal', '')} ${when} · ${st}</div>
+      <div class="row"><button class="btn" data-acal="${a.id}">${ic('cal')}Calendrier</button><button class="btn" data-arun="${a.id}">${ic('bell')}Tester</button><button class="btn danger" data-adel="${a.id}">${ic('trash')}</button></div></div>`;
+  }).join('');
+  const d = draft || newDraft(), dc = destChoices();
+  const form = `<h3>${alarms.length ? 'Nouveau réveil' : 'Programmer un réveil de départ'}</h3><div class="form">
+    <label>Où devez-vous être ?<select id="fDest">${dc.length ? dc.map((p, i) => `<option value="${i}" ${d.dest && hav([p.lat, p.lng], [d.dest.lat, d.dest.lng]) < 50 ? 'selected' : ''}>${esc(p.name)} · ${p.tag}</option>`).join('') : '<option value="">Cherchez d’abord une destination (champ B)</option>'}</select></label>
+    <div class="two"><label>Arrivée à<input type="time" id="fTime" value="${d.time}"></label><label>Le<input type="date" id="fDate" value="${d.date}" ${d.days.length ? 'disabled' : ''}></label></div>
+    <label>Répéter<div class="days">${[1, 2, 3, 4, 5, 6, 0].map(i => `<button type="button" data-fday="${i}" class="${d.days.includes(i) ? 'on' : ''}">${DAYS[i]}</button>`).join('')}</div></label>
+    <div class="two"><label>Pré-alerte<select id="fPrep">${[0, 10, 15, 20, 30, 45].map(m => `<option value="${m}" ${d.prep === m ? 'selected' : ''}>${m ? m + ' min avant' : 'Aucune'}</option>`).join('')}</select></label>
+      <label>Départ depuis<select id="fFrom"><option value="home" ${d.from === 'home' ? 'selected' : ''}>Maison</option><option value="gps" ${d.from === 'gps' ? 'selected' : ''}>Ma position</option></select></label></div>
+    <button class="btn primary wide" id="fSave">${ic('bell')}Créer le réveil</button></div>`;
+  const tips = `<div class="btns"><button class="btn wide" id="bsOn">${ic('moon')}Mode chevet (laisser ouvert la nuit)</button></div>
+    <div class="note"><b>Comment ça marche.</b> Ponctuel calcule l’heure de départ avec le trafic prévu, puis la recalcule en direct dans la dernière heure, avec votre marge de ${S.set.buffer} min. Sur téléphone, une page web ne sonne que si elle est ouverte : utilisez le <b>mode chevet</b> sur le chargeur, et ajoutez la <b>sécurité calendrier</b> qui sonne même appli fermée.</div>`;
+  return list + form + tips;
+}
+function bindAlarmPane() {
+  const pane = $('#pane'); if (curTab === 'alarm' && !draft) draft = newDraft();
+  pane.querySelectorAll('[data-aon]').forEach(c => c.onchange = () => { const a = alarms.find(x => x.id === c.dataset.aon); a.on = c.checked; a.occ = null; saveAlarms(); if (a.on) armAudio(); alarmTick(); render(); });
+  pane.querySelectorAll('[data-adel]').forEach(b => b.onclick = () => { alarms = alarms.filter(x => x.id !== b.dataset.adel); saveAlarms(); refreshAlarmPill(); render(); });
+  pane.querySelectorAll('[data-acal]').forEach(b => b.onclick = () => openIcs(alarms.find(x => x.id === b.dataset.acal)));
+  pane.querySelectorAll('[data-arun]').forEach(b => b.onclick = () => { armAudio(); const a = alarms.find(x => x.id === b.dataset.arun), o = a.occ || {};
+    setTimeout(() => fireAlarm({ ...a, occ: { key: new Date().toISOString(), dur: o.dur || 1800, delay: o.delay || 0, src: o.src || 'test', leave: Date.now() } }, 'main'), 300); });
+  pane.querySelectorAll('[data-fday]').forEach(b => b.onclick = () => { const i = +b.dataset.fday; draft.days = draft.days.includes(i) ? draft.days.filter(x => x !== i) : [...draft.days, i]; keepDraft(); render(); });
+  const keep = id => $(id) && ($(id).onchange = keepDraft); ['#fDest', '#fTime', '#fDate', '#fPrep', '#fFrom'].forEach(keep);
+  $('#bsOn') && ($('#bsOn').onclick = () => bedside(true));
+  $('#alFromTrip') && ($('#alFromTrip').onclick = () => { draft = newDraft(S.B); showTab('alarm'); });
+  $('#fSave') && ($('#fSave').onclick = () => {
+    keepDraft(); if (!draft.dest) { toast('Choisissez une destination : cherchez-la d’abord dans le champ B.', 4000, 'alert'); return; }
+    const a = { id: 'a' + Date.now().toString(36), on: true, ...draft, dest: { ...draft.dest } };
+    alarms.push(a); saveAlarms(); draft = null; armAudio();
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    toast('Réveil créé : je calcule l’heure de départ…', 3000, 'bell'); alarmTick().then(() => render()); render();
+  });
+}
+function keepDraft() {
+  if (!draft) return; const dc = destChoices(), i = $('#fDest')?.value;
+  if (i !== undefined && i !== '' && dc[+i]) draft.dest = dc[+i];
+  draft.time = $('#fTime')?.value || draft.time; draft.date = $('#fDate')?.value || draft.date;
+  draft.prep = +($('#fPrep')?.value ?? draft.prep); draft.from = $('#fFrom')?.value || draft.from;
+}
+injectIcons(); refreshAlarmPill();
