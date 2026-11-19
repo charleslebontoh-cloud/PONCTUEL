@@ -8,8 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png" type="image/png">
+<link rel="preload" as="image" href="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png">
+<link rel="apple-touch-icon" href="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -379,16 +380,27 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 #bedside small{max-width:34ch;opacity:.6}
 #bedside .btn{background:#111;color:#9fb3cc;border-color:#222;margin-top:10px}
 
+
+/* ===== Logo ===== */
+#splash{background:radial-gradient(120% 80% at 50% 40%,#1a2c4a 0%,#070c16 70%)}
+#splash .slogo{position:relative;width:min(84vw,400px);aspect-ratio:1;border-radius:30px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 60px rgba(255,178,30,.25);animation:logoIn 1.4s cubic-bezier(.2,.9,.3,1) both}
+#splash .slogo img{width:100%;height:100%;object-fit:cover;display:block;animation:kb 3.5s ease-out both}
+#splash .slogo::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%);transform:translateX(-120%);animation:shine 2.2s .6s ease-in-out}
+@keyframes logoIn{0%{transform:scale(.6) translateY(30px);opacity:0;filter:blur(8px)}60%{opacity:1;filter:blur(0)}100%{transform:none}}
+@keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
+#splash .bar{margin-top:22px}
+.brand h1 .blogo{width:30px;height:30px;border-radius:9px;object-fit:cover;box-shadow:0 4px 12px rgba(0,0,0,.35),0 0 0 1px rgba(255,178,30,.35);display:block}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
 </head>
 <body>
-<div id="splash"><div class="logo"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="#ffb21e" stroke-width="6"/><path class="hand" d="M32 32V16" stroke="#ffb21e" stroke-width="5" stroke-linecap="round"/><path d="M32 32l11 7" stroke="#3d9bff" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="32" r="4" fill="#fff"/></svg></div><b>Ponctuel</b><small>ARRIVEZ À L’HEURE</small><div class="bar"><i></i></div></div>
+<div id="splash"><div class="slogo"><img src="https://cdn.creativeclaw.co/u/79610596/images/e8bebf80-7c2d-4bca-86c2-f5e5bb06f0f9.png" alt="Ponctuel – Toujours à l’heure, en tout lieu"></div><div class="bar"><i></i></div></div>
 <div id="map" role="application" aria-label="Carte"></div>
 
 <section id="top" class="glass">
-  <div class="brand"><h1><i></i>Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
+  <div class="brand"><h1><img class="blogo" src="https://cdn.creativeclaw.co/u/79610596/images/a143c33e-6fbc-4ed3-a6cf-1d787f9dd49d.png" alt="">Ponctuel</h1><button id="alarmPill" hidden></button><span class="clock num"><span data-ic="clock"></span><span id="clock">--:--</span></span></div>
   <div class="fields">
     <label class="field a"><b>A</b><input id="inA" placeholder="Ma position" autocomplete="off" aria-label="Départ"></label>
     <button id="swap" title="Inverser départ et arrivée" aria-label="Inverser"><span data-ic="swap"></span></button>
@@ -490,6 +502,6 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
