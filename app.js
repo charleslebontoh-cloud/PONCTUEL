@@ -101,7 +101,7 @@ const S = {
   places: store.get('places', []), trips: store.get('trips', []), cells: store.get('cells', {}),
   A: null, B: null, routes: [], sel: 0, satIdx: 0, destJam: null,
   pos: null, heading: null, devHeading: null, speed: 0,
-  nav: null, base: 'plan', traffic: false, heat: false, follow: false, compassMode: 'north', updatedAt: null, cam: { z: 16, pitch: 50 }
+  nav: null, base: store.get('base', 'real'), traffic: false, heat: false, follow: false, compassMode: 'north', updatedAt: null, cam: { z: 16, pitch: 50 }
 };
 const saveSet = () => store.set('settings', S.set);
 if (!S.set.v3d) { if (S.set.vehicle === 'car') { S.set.vehicle = 'kaiyi'; if (S.set.vcolor === '#2f7bff') S.set.vcolor = '#f7f7f7'; } S.set.v3d = 1; saveSet(); }
@@ -222,17 +222,33 @@ const SAT_TILES = [
 ];
 // Carte 3D TomTom Orbis (avec la clé) : bâtiments 3D éclairés, icônes de lieux, style nuit soigné
 let orbisOk = null, orbisUrl = null;
+let orbisRetryAt = 0;
 async function orbisStyle(map) {
-  if (!S.set.key || S.set.engine === 'ofm' || orbisOk === false) return null;
-  const k = encodeURIComponent(S.set.key), q = `?key=${k}&apiVersion=1&map=${map}`;
+  if (!S.set.key || S.set.engine === 'ofm') return null;
+  if (orbisOk === false && Date.now() < orbisRetryAt) return null;
+  if (map.endsWith('-driving')) { const st = await orbisStyle0(map); return st || orbisStyle0(map.replace('-driving', '')); }
+  return orbisStyle0(map);
+}
+async function orbisStyle0(map) {
+  const k0 = encodeURIComponent(S.set.key);
+  const q = `?key=${k0}&apiVersion=1&map=${map}`;
   const urls = orbisUrl ? [orbisUrl] : ['0.*/style.json', '0.*/style', '0.0.0-0/style.json', '0.0.0-0/style'].map(v => `https://api.tomtom.com/maps/orbis/assets/styles/${v}`);
   for (const u of urls) {
     try { const st = await getJSON(u + q, 8000); if (st?.layers?.length) { orbisUrl = u; orbisOk = true; st.__orbis = true; return st; } } catch (e) { console.warn('Orbis', u, e.message); }
   }
-  orbisOk = false; return null;
+  orbisUrl = null; orbisOk = false; orbisRetryAt = Date.now() + 60000; return null; // nouvel essai dans 1 min
 }
 async function styleFor(kind) {
   const night = nightNow();
+  if (kind === 'real') { // photo satellite au sol, routes et noms par-dessus, bâtiments en relief (ajoutés dans addOverlays)
+    let st; try { st = await getJSON(OFM + 'liberty', 8000); } catch { return rasterStyle(SAT_TILES); }
+    const drop = l => l.type === 'background' || l.type === 'fill' || l.type === 'fill-extrusion' || /landuse|landcover|park|aeroway|hillshade/.test(l.id);
+    st.layers = st.layers.filter(l => !drop(l)).map(l => { if (l.type === 'line' && /road|highway|bridge|tunnel|street|path|rail/.test(l.id)) { l.paint = { ...(l.paint || {}), 'line-opacity': .55 }; } return l; });
+    st.sources.sat = { type: 'raster', tiles: [SAT_TILES[0].url], tileSize: 256, maxzoom: 19, attribution: SAT_TILES[0].attr };
+    st.layers.unshift({ id: 'sat', type: 'raster', source: 'sat', paint: { 'raster-fade-duration': 200, 'raster-brightness-max': night ? .55 : 1, 'raster-saturation': .1, 'raster-contrast': .08 } });
+    st.sources.dem = { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Relief : Mapzen / AWS Terrain Tiles' };
+    st.__real = true; return st;
+  }
   if (kind === 'sat') return (await orbisStyle('basic_street-satellite')) || rasterStyle(SAT_TILES);
   if (kind === 'nasa') { // carte normale + nuages/météo NASA en transparence
     const st = await styleFor('plan');
@@ -290,13 +306,15 @@ function atmosphere() {
   try { map.setSky?.({ 'sky-color': night ? '#0a1426' : '#8ec5ff', 'horizon-color': night ? '#1d3358' : '#dcecff', 'fog-color': night ? '#0b1220' : '#eef4fb', 'sky-horizon-blend': .6, 'horizon-fog-blend': .7, 'fog-ground-blend': .4 }); } catch { }
 }
 
-const BASES = ['plan', 'sat', 'nasa'], BASE_LBL = { plan: 'Plan', sat: 'Sat', nasa: 'Météo' };
+const BASES = ['real', 'plan', 'sat', 'nasa'], BASE_LBL = { real: 'Réel', plan: 'Plan', sat: 'Sat', nasa: 'Météo' };
+$('#bLayerLbl').textContent = BASE_LBL[S.base] || 'Plan';
 $('#bLayer').onclick = () => {
-  S.base = BASES[(BASES.indexOf(S.base) + 1) % 3];
+  S.base = BASES[(BASES.indexOf(S.base) + 1) % BASES.length]; store.set('base', S.base);
   $('#bLayerLbl').textContent = BASE_LBL[S.base];
   applyBase();
   if (S.base === 'nasa') { toast('Météo NASA : nuages et pluie vus par satellite (MODIS), en transparence sur la carte. Dézoomez pour voir la région.', 6000); if (!S.nav) { S.follow = false; map.easeTo({ zoom: Math.min(map.getZoom(), 8), pitch: 0, duration: 1200 }); } }
   if (S.base === 'sat') toast('Satellite haute résolution. Activez le trafic pour superposer les bouchons en direct.');
+  if (S.base === 'real') { toast('Mode Réel : vraie photo satellite, bâtiments en relief et terrain 3D.', 4000, 'cube'); if (!S.set.three) $('#b3d').click(); }
 };
 
 /* ---- Couches dessinées par l'appli (ré-ajoutées à chaque changement de fond) ---- */
@@ -310,7 +328,15 @@ function addOverlays() {
   const st = map.getStyle();
   // Bâtiments 3D si la carte vectorielle en a et ne les dessine pas déjà
   const omt = st.sources.openmaptiles;
-  if (omt && !st.layers.some(l => l.type === 'fill-extrusion')) {
+  if (omt && st.__real !== false && map.getSource('sat') && !st.layers.some(l => l.type === 'fill-extrusion')) {
+    const night = nightNow();
+    map.addLayer({ id: 'b3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13.5,
+      paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, night ? '#3a3f4a' : '#e6dfd2', 15, night ? '#4b5466' : '#efe9de', 60, night ? '#5d6f8f' : '#f6f3ee', 150, night ? '#7d93b8' : '#dfe7f0'],
+        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13.5, 0, 15, ['coalesce', ['get', 'render_height'], 7]], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+        'fill-extrusion-opacity': .93, 'fill-extrusion-vertical-gradient': true } }, firstSymbol());
+    try { map.setTerrain({ source: 'dem', exaggeration: 1.4 }); } catch { }
+  } else if (omt && !st.layers.some(l => l.type === 'fill-extrusion')) {
+    try { map.setTerrain(null); } catch { }
     map.addLayer({ id: 'b3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14,
       paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, nightNow() ? '#1f2a3b' : '#d9d2c6', 40, nightNow() ? '#34465f' : '#ece6dc', 120, nightNow() ? '#4a6185' : '#f7f3ec'], 'fill-extrusion-vertical-gradient': true, 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .82 } }, firstSymbol());
   }
@@ -1055,7 +1081,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 18 · alerte lenteur</p>
+  <p class="empty" style="font-size:12px">Version 19 · mode Réel 3D</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
