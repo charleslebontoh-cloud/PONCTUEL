@@ -43,6 +43,11 @@ const CARD = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 const cardinal = h => CARD[Math.round(((h % 360) + 360) % 360 / 45) % 8];
 let toastT;
 function toast(msg, ms = 3500, icon) { const t = $('#toast'); t.innerHTML = (icon && typeof ic === 'function' ? ic(icon) : '') + '<span></span>'; t.lastChild.textContent = msg; t.hidden = false; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+async function postJSON(url, body, ms = 12000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
 async function getJSON(url, ms = 12000) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
@@ -320,7 +325,7 @@ $('#bLayer').onclick = () => {
 /* ---- Couches dessinées par l'appli (ré-ajoutées à chaque changement de fond) ---- */
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const lineFC = (coords, props = {}) => ({ type: 'FeatureCollection', features: coords.length > 1 ? [{ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: coords.map(ll) } }] : [] });
-const data = { alts: EMPTY, main: EMPTY, done: EMPTY, jams: EMPTY, heat: EMPTY };
+const data = { alts: EMPTY, main: EMPTY, done: EMPTY, jams: EMPTY, heat: EMPTY, offer: EMPTY };
 function setData(id, fc) { data[id] = fc; map.getSource(id)?.setData(fc); }
 const trafficTiles = () => [`https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${encodeURIComponent(S.set.key)}&thickness=10&tileSize=256&t=${Math.floor(Date.now() / 120000)}`];
 function firstSymbol() { return map.getStyle().layers.find(l => l.type === 'symbol')?.id; }
@@ -345,7 +350,7 @@ function addOverlays() {
     map.addSource('traffic', { type: 'raster', tiles: trafficTiles(), tileSize: 256, maxzoom: 22 });
     map.addLayer({ id: 'traffic', type: 'raster', source: 'traffic', paint: { 'raster-opacity': .9, 'raster-fade-duration': 300 } }, firstSymbol());
   }
-  for (const id of ['heat', 'alts', 'done', 'jams']) map.addSource(id, { type: 'geojson', data: data[id] });
+  for (const id of ['heat', 'alts', 'done', 'jams', 'offer']) map.addSource(id, { type: 'geojson', data: data[id] });
   map.addSource('main', { type: 'geojson', data: data.main, lineMetrics: true });
   map.addLayer({ id: 'heat', type: 'circle', source: 'heat', paint: { 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 10, 3, 15, 30, 18, 110], 'circle-color': ['case', ['<', ['get', 'sp'], 10], '#ff4b4b', '#ff9a2e'], 'circle-opacity': .35, 'circle-blur': .6 } });
   map.addLayer({ id: 'alts', type: 'line', source: 'alts', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': getCss('--alt'), 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 17, 11], 'line-opacity': .7 } });
@@ -355,6 +360,7 @@ function addOverlays() {
     'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, getCss('--route'), 1, getCss('--route-2')] } });
   map.addLayer({ id: 'main-flow', type: 'line', source: 'main', paint: { 'line-color': '#ffffff', 'line-opacity': .55, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 17, 4], 'line-dasharray': [0, 4, 3] } });
   map.addLayer({ id: 'done', type: 'line', source: 'done', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7d8796', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 17, 14], 'line-opacity': .9 } });
+  map.addLayer({ id: 'offer', type: 'line', source: 'offer', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2fd27a', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 17, 12], 'line-dasharray': [1.2, .8], 'line-opacity': .95 } });
   map.addLayer({ id: 'jams-glow', type: 'line', source: 'jams', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['case', ['>=', ['get', 'mag'], 3], '#ff4b4b', '#ff9a2e'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 12, 17, 28], 'line-blur': 8, 'line-opacity': .55 } });
   map.addLayer({ id: 'jams', type: 'line', source: 'jams', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['case', ['>=', ['get', 'mag'], 3], '#ff3b3b', '#ff9a2e'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 17, 12] } });
 }
@@ -663,7 +669,13 @@ async function calc(opts = {}) {
   if (!a) { startGeo(); toast('En attente du GPS… ou saisissez un point de départ.'); waitPosThen(calc); return; }
   if (!opts.silent) { showTab('trip'); $('#pane').innerHTML = '<p class="empty">Calcul des itinéraires et analyse du trafic…</p><div class="skel"></div><div class="skel" style="opacity:.6"></div><div class="skel" style="opacity:.35"></div>'; }
   let routes;
-  try { routes = S.set.key ? await tomtomRoutes(a, b) : await osrmRoutes(a, b); }
+  try {
+    if (opts.fast && S.set.key) { // recalcul express : le premier qui répond gagne, TomTom remplace ensuite si plus tard
+      const tt = tomtomRoutes(a, b).catch(() => null), os = osrmRoutes(a, b).catch(() => null);
+      routes = await Promise.race([tt, new Promise(r => setTimeout(() => r(null), 1600))]) || await os || await tt;
+      if (opts.onLate) tt.then(x => { if (x?.length && x !== routes) { x.forEach(r => { applyPersonal(r); smartEta(r); }); opts.onLate(x); } });
+    } else routes = S.set.key ? await tomtomRoutes(a, b, { avoidRects: opts.avoidRects }) : await osrmRoutes(a, b);
+  }
   catch (e) {
     console.warn(e);
     if (S.set.key) { try { routes = await osrmRoutes(a, b); if (!opts.silent) toast('Trafic TomTom indisponible : itinéraire sans trafic en direct.'); } catch (e2) { console.warn(e2); } }
@@ -681,15 +693,16 @@ async function calc(opts = {}) {
 function waitPosThen(fn) { const t0 = Date.now(); const iv = setInterval(() => { if (S.pos) { clearInterval(iv); fn(); } else if (Date.now() - t0 > 20000) clearInterval(iv); }, 500); }
 $('#go').onclick = () => calc();
 
-async function tomtomRoutes(a, b) {
+async function tomtomRoutes(a, b, opt = {}) {
   const avoid = [S.set.tolls && 'tollRoads', S.set.highways && 'motorways'].filter(Boolean).map(x => '&avoid=' + x).join('');
   const q = `/${a.lat},${a.lng}:${b.lat},${b.lng}/json?key=${encodeURIComponent(S.set.key)}` +
     `&traffic=true&routeType=fastest&travelMode=car&maxAlternatives=2&departAt=now&computeTravelTimeFor=all&sectionType=traffic&instructionsType=text&language=fr-FR${avoid}`;
   const urls = S.set.orbis ? [`https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`, `https://api.tomtom.com/routing/1/calculateRoute${q}`]
     : [`https://api.tomtom.com/routing/1/calculateRoute${q}`, `https://api.tomtom.com/maps/orbis/routing/calculateRoute${q}&apiVersion=2`];
   let j;
+  const body = opt.avoidRects?.length ? JSON.stringify({ avoidAreas: { rectangles: opt.avoidRects } }) : null;
   for (const [i, u] of urls.entries()) {
-    try { j = await getJSON(u, 15000); if (j.routes?.length) { S.set.orbis = u.includes('/orbis/'); saveSet(); break; } }
+    try { j = body ? await postJSON(u, body, 12000) : await getJSON(u, 15000); if (j.routes?.length) { S.set.orbis = u.includes('/orbis/'); saveSet(); break; } }
     catch (e) { if (i === urls.length - 1) throw e; }
   }
   if (!j?.routes) throw new Error('aucun itinéraire');
@@ -911,7 +924,7 @@ function stopNav(arrived) {
   try { wakeLock?.release(); } catch { } wakeLock = null;
   for (const id of ['#top', '#sheet']) $(id).hidden = false;
   for (const id of ['#nav', '#navbar', '#speed', '#recenter', '#bReport', '#reportSheet']) $(id).hidden = true;
-  document.body.classList.remove('navmode', 'peek'); exitFullscreen();
+  document.body.classList.remove('navmode', 'peek'); exitFullscreen(); clearInterval(offerT); $('#nOffer').hidden = true; setData('offer', EMPTY);
   $('#fab').style.bottom = '';
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
   map.easeTo({ bearing: 0, pitch: S.set.three ? 45 : 0, duration: 800 });
@@ -988,23 +1001,21 @@ function navUpdate() {
   $('#nWarn').hidden = true;
   refreshCompass(); syncSheet();
   if (left < 40 || hav(p, [S.B.lat, S.B.lng]) < 35) { stopNav(true); return; }
-  if (fresh) { if (bd > 120) n.off += 2; else if (bd > 40) n.off++; else n.off = 0; }
+  const segB = r.coords[best + 1] ? bearingOf(r.coords[best], r.coords[best + 1]) : null;
+  const wrongWay = fresh && segB != null && S.speed > 12 && S.heading != null && Math.abs(angDiff(S.heading, segB)) > 75 && bd > 15;
+  if (fresh) { if (bd > 120) n.off += 2; else if (bd > 40 || wrongWay) n.off++; else n.off = 0; }
   if (n.off >= 2 && S.set.reroute && Date.now() - (n.rerouteAt || 0) > 8000) { n.off = 0; n.rerouteAt = Date.now(); speak('Nouvel itinéraire.'); const stat2 = $('#nStatus'); stat2.className = 'nstatus slow'; stat2.lastChild.textContent = 'Recalcul de l’itinéraire…'; reroute(); }
-  if (Date.now() - n.lastCheck > (crawling ? 45000 : 120000)) { n.lastCheck = Date.now(); betterRoute(leftT); }
+  if (crawling && slowFor > 45 && !n.crawlFind) { n.crawlFind = 1; findBetter('au pas'); }
+  if (!crawling) n.crawlFind = 0;
+  if (Date.now() - n.lastCheck > (crawling ? 40000 : 60000)) { n.lastCheck = Date.now(); betterRoute(leftT); }
 }
 const lc = s => s.charAt(0).toLowerCase() + s.slice(1);
 async function reroute() {
-  const rs = await calc({ silent: true, from: { lat: S.pos[0], lng: S.pos[1] } });
+  const nav0 = S.nav;
+  const rs = await calc({ silent: true, fast: true, from: { lat: S.pos[0], lng: S.pos[1] }, onLate: x => { if (S.nav === nav0 && S.nav.r === rs?.[0]) { S.routes = x; S.nav.r = x[0]; S.nav.idx = 0; drawRoutes(false); } } });
   if (rs?.length && S.nav) { S.routes = rs; S.sel = 0; S.nav.r = rs[0]; S.nav.idx = 0; S.nav.spoken = {}; S.nav.live = null; S.nav.done = 0; S.nav.trace = []; drawRoutes(false); toast(`Nouvel itinéraire : ${fmtDur(rs[0].dur)}`, 3000, 'route'); }
 }
-async function betterRoute(curLeft) {
-  const rs = await calc({ silent: true, from: { lat: S.pos[0], lng: S.pos[1] } });
-  if (!rs?.length || !S.nav) return;
-  const gain = curLeft - rs[0].dur;
-  const same = rs.find(x => Math.abs(x.dist - (S.nav.r.dist - S.nav.done)) < Math.max(400, x.dist * .08)) || rs[0];
-  S.nav.live = { left: same.dur, done: S.nav.done, at: Date.now() }; // temps restant rafraîchi avec le trafic actuel
-  if (gain >= 180) { S.routes = rs; S.sel = 0; S.nav.r = rs[0]; S.nav.idx = 0; S.nav.spoken = {}; drawRoutes(true); speak(`Itinéraire plus rapide trouvé. Vous gagnez ${Math.round(gain / 60)} minutes.`); toast(`Nouvel itinéraire : −${fmtDur(gain)}`); }
-}
+async function betterRoute(curLeft) { return findBetter('périodique', curLeft); }
 let voiceFr = null;
 function speak(t) {
   if (!S.set.voice || !('speechSynthesis' in window)) return;
@@ -1109,7 +1120,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 22 · bouchons annoncés à l’avance</p>
+  <p class="empty" style="font-size:12px">Version 23 · contournement des bouchons</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1812,4 +1823,71 @@ async function probeAhead() {
     if (S.nav === n) n.probes = out.filter(Boolean);
   } finally { probing = false; }
 }
-setInterval(probeAhead, 5000);
+setInterval(() => probeAhead(), 5000);
+
+/* ================= Contournement intelligent des bouchons =================
+   Bouchons connus devant (sondes de vitesse TomTom + votre allure réelle) → retard estimé de chaque route,
+   recherche d'itinéraires qui évitent ces zones, proposition du plus rapide (acceptée seule après 10 s). */
+function knownJams(n) {
+  const out = [], r = n.r;
+  for (const q of (n.probes || [])) if (q.ratio < .6 && q.off > n.done) {
+    const i = Math.max(0, r.cum.findIndex(c => c >= q.off)); const L = 500;
+    out.push({ p: r.coords[i], off: q.off, pen: Math.max(0, L / (Math.max(q.speed, 3) / 3.6) - L / (q.free / 3.6)) });
+  }
+  if (n.slowSince && Date.now() - n.slowSince > 40000) { // on est dedans : on suppose qu'il continue ~600 m
+    const i = Math.max(0, r.cum.findIndex(c => c >= n.done + 300)); out.push({ p: r.coords[i] || S.pos, off: n.done + 300, pen: 600 / 1.5 - 600 / 8, here: true });
+  }
+  return out;
+}
+const rectAround = (p, d = .0022) => ({ southWestCorner: { latitude: p[0] - d, longitude: p[1] - d }, northEastCorner: { latitude: p[0] + d, longitude: p[1] + d } });
+function penaltyFor(route, jams) {
+  let pen = 0; for (const j of jams) { for (let i = 0; i < route.coords.length; i += 2) if (hav(route.coords[i], j.p) < 90) { pen += j.pen; break; } } return pen;
+}
+let finding = false, offerT = null;
+async function findBetter(reason, curLeftArg) {
+  const n = S.nav; if (!n || finding || !S.pos || Date.now() - (n.findAt || 0) < 20000) return;
+  finding = true; n.findAt = Date.now(); n.lastCheck = Date.now();
+  try {
+    const from = { lat: S.pos[0], lng: S.pos[1] }, jams = knownJams(n);
+    const avoidRects = jams.filter(j => hav(j.p, S.pos) > 260).slice(0, 8).map(j => rectAround(j.p));
+    if (jams.some(j => j.here)) { const k = Math.max(0, n.r.cum.findIndex(c => c >= n.done + 450)); if (n.r.coords[k]) avoidRects.push(rectAround(n.r.coords[k], .0015)); }
+    const [a, b] = await Promise.all([calc({ silent: true, from }), avoidRects.length && S.set.key ? calc({ silent: true, from, avoidRects }) : Promise.resolve(null)]);
+    if (S.nav !== n) return;
+    const cands = [...(a || []), ...(b || [])];
+    if (!cands.length) return;
+    const leftNow = r => r.dur;
+    const curLeft = (curLeftArg ?? (n.live ? n.live.left : n.r.dur * ((n.r.dist - n.done) / n.r.dist)));
+    const curTotal = curLeft + jams.reduce((t, j) => t + j.pen, 0);
+    // l'itinéraire actuel recalculé sert aussi à rafraîchir le temps restant
+    const same = cands.find(x => Math.abs(x.dist - (n.r.dist - n.done)) < Math.max(400, x.dist * .06));
+    if (same) n.live = { left: same.dur, done: n.done, at: Date.now() };
+    let best = null;
+    for (const c of cands) { c.total = leftNow(c) + penaltyFor(c, jams); if (!best || c.total < best.total) best = c; }
+    const gain = curTotal - best.total, isSame = same && best === same && !jams.length;
+    const need = jams.length ? 60 : 150;
+    if (!isSame && gain >= need) offerRoute(best, gain, jams.length ? 'évite le bouchon' : 'trafic plus fluide', cands);
+  } finally { finding = false; }
+}
+function offerRoute(route, gain, why, cands) {
+  const n = S.nav; if (!n) return;
+  n.offer = route; setData('offer', lineFC(route.coords));
+  const box = $('#nOffer'); box.hidden = false;
+  box.querySelector('b').textContent = `Itinéraire plus rapide · −${fmtDur(gain)}`;
+  box.querySelector('small').textContent = `${why} · arrivée ${fmtTime(new Date(Date.now() + route.dur * 1000))}`;
+  speak(`Itinéraire plus rapide trouvé : ${Math.round(gain / 60)} minutes de moins. Je le prends dans dix secondes.`); navigator.vibrate?.([80, 60, 80]);
+  let k = 10; const btn = $('#ofTake'); btn.textContent = `Prendre (${k})`;
+  clearInterval(offerT); offerT = setInterval(() => { k--; btn.textContent = `Prendre (${k})`; if (k <= 0) takeOffer(); }, 1000);
+  n._offerCands = cands;
+}
+function takeOffer() {
+  clearInterval(offerT); const n = S.nav; $('#nOffer').hidden = true; setData('offer', EMPTY); if (!n?.offer) return;
+  const r = n.offer; n.offer = null;
+  S.routes = [r, ...(n._offerCands || []).filter(x => x !== r)].slice(0, 3); S.sel = 0;
+  n.r = r; n.idx = 0; n.spoken = {}; n.live = null; n.done = 0; n.trace = []; n.probes = []; n.probeAt = 0; n.slowSince = 0; n.crawlAsked = 0;
+  drawRoutes(true); speak('Nouvel itinéraire.'); toast('Nouvel itinéraire plus rapide', 2500, 'route');
+}
+function dropOffer() { clearInterval(offerT); if (S.nav) { S.nav.offer = null; S.nav.findAt = Date.now() + 60000; } $('#nOffer').hidden = true; setData('offer', EMPTY); }
+$('#ofTake').onclick = takeOffer; $('#ofSkip').onclick = dropOffer;
+// un nouveau bouchon repéré devant déclenche aussitôt la recherche
+const _probe0 = probeAhead;
+probeAhead = async function () { const n = S.nav, before = (n?.probes || []).filter(q => q.ratio < .6).length; await _probe0(); if (S.nav === n && n && (n.probes || []).filter(q => q.ratio < .6).length > before) findBetter('bouchon devant'); };
