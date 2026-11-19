@@ -440,6 +440,31 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 .aimic.on{background:#ff3b5c;color:#fff;animation:ring 1.2s infinite}
 .aisend{background:linear-gradient(135deg,#7c5cff,#3d9bff);color:#fff;box-shadow:0 6px 16px rgba(124,92,255,.4)}
 
+
+/* ===== Guidage plein écran : seulement l'essentiel ===== */
+#navbar{left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:520px;margin:0 auto;
+  border-radius:26px;border-bottom:1px solid var(--line);padding:8px 8px 8px}
+#navbar .row{gap:8px}
+#navbar .k{flex:1;display:flex;justify-content:space-around;gap:6px;flex-wrap:nowrap;text-align:center}
+#navbar .k div b{font-size:22px;line-height:1.05;white-space:nowrap}
+#navbar .k b em{font-style:normal;font-size:13px;font-weight:700;color:var(--muted)}
+#navbar .k div small{font-size:11px}
+#navbar .prog{height:4px;margin:8px 10px 2px}
+#navbar .nb{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--glass-2);display:grid;place-items:center;flex:none;color:var(--text)}
+#navbar #nStop{background:rgba(255,75,75,.14);color:var(--jam);border-color:rgba(255,75,75,.35)}
+#navbar .tray{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;animation:rise .25s ease-out}
+#navbar .tray .btn{flex-direction:column;gap:4px;padding:10px 4px;font-size:12px}
+#speed{width:58px;height:58px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px)}
+#speed svg{width:60px;height:60px}
+#speed b{font-size:21px}
+body.navmode #lstack,body.navmode #fab,body.navmode #bReport{opacity:0;pointer-events:none;transform:translateX(12px);transition:opacity .3s,transform .3s}
+body.navmode #lstack{transform:translateX(-12px)}
+body.navmode.peek #lstack,body.navmode.peek #fab{opacity:1;pointer-events:auto;transform:none}
+body.navmode #fab{bottom:calc(env(safe-area-inset-bottom,0px) + 100px)!important}
+body.navmode #recenter{bottom:calc(env(safe-area-inset-bottom,0px) + 98px)!important}
+body.navmode .maplibregl-ctrl-bottom-right,body.navmode .maplibregl-ctrl-bottom-left{display:none}
+#nav .instr{border-radius:22px}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
@@ -515,16 +540,21 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </div>
 <div id="speed" class="glass" hidden><svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="33" fill="none" stroke="var(--line)" stroke-width="4" stroke-dasharray="155 300" stroke-linecap="round"/><circle id="spdArc" cx="37" cy="37" r="33" fill="none" stroke="var(--go)" stroke-width="4" stroke-dasharray="0 300" stroke-linecap="round" style="transition:stroke-dasharray .6s,stroke .3s"/></svg><div><b id="spd">0</b><small>km/h</small></div></div>
 <div id="navbar" class="glass" hidden>
-  <div class="prog"><i id="nProg"></i></div>
   <div class="row">
+    <button class="nb" id="nStop" aria-label="Arrêter le guidage"><span data-ic="x"></span></button>
     <div class="k">
       <div class="eta" id="nEtaBox"><b id="nEta">--:--</b><small>arrivée</small></div>
       <div><b id="nLeft">--</b><small>restant</small></div>
-      <div><b id="nKm">--</b><small>km</small></div>
+      <div><b><span id="nKm">--</span><em> km</em></b><small>distance</small></div>
     </div>
-    <button class="btn" id="nShare" aria-label="Partager mon heure d’arrivée"><span data-ic="share"></span></button>
-    <button class="btn" id="nMute" aria-label="Couper la voix"><span data-ic="vol"></span></button>
-    <button class="btn danger" id="nStop"><span data-ic="x"></span>Arrêter</button>
+    <button class="nb" id="nMore" aria-label="Plus d’options"><span data-ic="dots"></span></button>
+  </div>
+  <div class="prog"><i id="nProg"></i></div>
+  <div class="tray" id="nTray" hidden>
+    <button class="btn" id="nShare"><span data-ic="share"></span>Partager</button>
+    <button class="btn" id="nMute"><span data-ic="vol"></span>Voix</button>
+    <button class="btn" id="nRep"><span data-ic="alert"></span>Signaler</button>
+    <button class="btn" id="nAI"><span data-ic="sparkle"></span>IA</button>
   </div>
 </div>
 <div id="toast" hidden></div>
@@ -566,6 +596,6 @@ button,.btn,.chip,.ctl{position:relative;overflow:hidden}
 </section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

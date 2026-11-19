@@ -87,6 +87,7 @@ const ICONS = {
   sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7zM5 3l.6 1.6L7.2 5.2 5.6 5.8 5 7.4 4.4 5.8 2.8 5.2 4.4 4.6z"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/>',
   send: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
+  dots: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -860,9 +861,10 @@ async function startNav() {
   startGeo();
   S.nav = { r, start: Date.now(), planned: targetDate()?.getTime() || null, spoken: {}, off: 0, lastCheck: Date.now(), done: 0, idx: 0 };
   S.compassMode = 'heading'; meMode = ''; meLook(); refreshCompass();
-  for (const id of ['#top', '#sheet', '#sat']) $(id).hidden = true; $('#bReport').hidden = false; muteIcon();
+  for (const id of ['#top', '#sheet', '#sat', '#aiPanel']) $(id).hidden = true; $('#bReport').hidden = true; $('#nTray').hidden = true; muteIcon();
+  document.body.classList.add('navmode'); enterFullscreen();
   $('#nav').hidden = false; $('#navbar').hidden = false; $('#speed').hidden = false;
-  $('#fab').style.bottom = 'calc(env(safe-area-inset-bottom,0px) + 110px)'; setData('alts', EMPTY); setTimeout(syncSheet, 50);
+  setData('alts', EMPTY); setTimeout(syncSheet, 50);
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { }
   if (orbisOk && S.base === 'plan') applyBase();
   speak(`C'est parti. Arrivée prévue à ${fmtTime(new Date(Date.now() + r.dur * 1000))}.`);
@@ -881,13 +883,14 @@ function stopNav(arrived) {
   try { wakeLock?.release(); } catch { } wakeLock = null;
   for (const id of ['#top', '#sheet']) $(id).hidden = false;
   for (const id of ['#nav', '#navbar', '#speed', '#recenter', '#bReport', '#reportSheet']) $(id).hidden = true;
+  document.body.classList.remove('navmode', 'peek'); exitFullscreen();
   $('#fab').style.bottom = '';
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
   map.easeTo({ bearing: 0, pitch: S.set.three ? 45 : 0, duration: 800 });
   meMode = ''; meLook(); refreshCompass(); setData('done', EMPTY); drawRoutes(false); render(); if (orbisOk && S.base === 'plan') applyBase();
 }
 $('#nStop').onclick = () => stopNav(false);
-const muteIcon = () => $('#nMute').innerHTML = ic(S.set.voice ? 'vol' : 'mute');
+const muteIcon = () => $('#nMute').innerHTML = ic(S.set.voice ? 'vol' : 'mute') + (S.set.voice ? 'Voix' : 'Muet');
 $('#nMute').onclick = () => { S.set.voice = !S.set.voice; saveSet(); muteIcon(); toast(S.set.voice ? 'Guidage vocal activé' : 'Guidage vocal coupé', 2000, S.set.voice ? 'vol' : 'mute'); };
 function navUpdate() {
   const n = S.nav, r = n.r, p = S.pos;
@@ -1040,7 +1043,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 16 · Ponctuel IA</p>
+  <p class="empty" style="font-size:12px">Version 17 · guidage plein écran</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1668,4 +1671,20 @@ $('#bAI').onclick = openAI;
 $('#aiClose').onclick = () => { $('#aiPanel').hidden = true; rec?.stop(); };
 $('#aiMic').onclick = micToggle;
 $('#aiForm').onsubmit = e => { e.preventDefault(); aiAsk($('#aiIn').value); };
+injectIcons();
+
+
+/* ================= Guidage plein écran ================= */
+// Plein écran natif quand le navigateur le permet (Android) ; sur iPhone, l'appli installée sur l'écran d'accueil est déjà en plein écran.
+function enterFullscreen() { const d = document.documentElement; try { if (!document.fullscreenElement && d.requestFullscreen && !matchMedia('(display-mode: standalone)').matches) d.requestFullscreen({ navigationUI: 'hide' }).catch(() => { }); } catch { } }
+function exitFullscreen() { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); } catch { } }
+// Un toucher sur la carte fait apparaître les commandes 6 secondes
+let peekT = null;
+function peek() { if (!S.nav) return; document.body.classList.add('peek'); clearTimeout(peekT); peekT = setTimeout(() => document.body.classList.remove('peek'), 6000); }
+map.on('click', () => { if (S.nav) document.body.classList.contains('peek') ? (clearTimeout(peekT), document.body.classList.remove('peek')) : peek(); });
+$('#nMore').onclick = () => { $('#nTray').hidden = !$('#nTray').hidden; };
+$('#nRep').onclick = () => { $('#nTray').hidden = true; $('#reportSheet').hidden = false; };
+$('#nAI').onclick = () => { $('#nTray').hidden = true; openAI(); };
+// la barre d'options se referme toute seule
+document.addEventListener('pointerdown', e => { if (!$('#nTray').hidden && !e.target.closest('#navbar')) $('#nTray').hidden = true; }, { passive: true });
 injectIcons();
