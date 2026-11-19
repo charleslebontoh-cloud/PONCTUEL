@@ -912,6 +912,7 @@ async function startNav() {
 }
 function stopNav(arrived) {
   const n = S.nav; if (!n) return;
+  saveNavLog(n, arrived);
   if (arrived && n.pred && n.done > n.r.dist * .7) learnEta(n);
   if (arrived) { arriveIn.value = ''; store.set('arrive', ''); }
   if (arrived || n.done > 500) {
@@ -951,7 +952,8 @@ function navUpdate() {
   const tr = n.trace, span = tr.length > 1 ? (tr[tr.length - 1].t - tr[0].t) / 1000 : 0, pace = span > 120 ? (tr[tr.length - 1].d - tr[0].d) / span : null; // m/s observés sur ~5 min
   // allure réelle sur ~75 s, comparée à la vitesse normale de la route
   const tw = n.trace.filter(x => Date.now() - x.t < 75000), spanW = tw.length > 1 ? (tw[tw.length - 1].t - tw[0].t) / 1000 : 0;
-  const paceK = spanW > 30 ? Math.max(0, (tw[tw.length - 1].d - tw[0].d) / spanW * 3.6) : null;
+  const paceK = spanW > 20 ? Math.max(0, (tw[tw.length - 1].d - tw[0].d) / spanW * 3.6) : null;
+  n.paceT0 = spanW > 20 ? tw[0].t : null;
   const freeK = r.free ? (r.dist / r.free) * 3.6 : 40, normK = r.dur ? (r.dist / r.dur) * 3.6 : freeK * .6;
   n.paceK = paceK; n.freeK = freeK;
   if (n.crawling && paceK != null) { // bouchon constaté : ~1,2 km à l'allure réelle, le reste à l'allure prévue
@@ -983,7 +985,7 @@ function navUpdate() {
   const pk = n.paceK ?? pace90, ratioK = pk != null ? pk / Math.max(n.freeK || 40, 15) : null;
   const slowNow = pk != null ? (ratioK < .45 || pk < 15) : S.speed < 10;
   const clearNow = pk != null ? (ratioK > .65 && pk >= 20) : S.speed > 25;
-  if (slowNow && (n.movedAt || Date.now() - n.start > 30000)) n.slowSince = n.slowSince || Date.now();
+  if (slowNow && (n.movedAt || Date.now() - n.start > 20000)) n.slowSince = n.slowSince || (pk != null && n.paceT0 ? n.paceT0 : Date.now()); // la lenteur est mesurée depuis le début de la fenêtre
   else if (clearNow) { n.slowSince = 0; n.crawlAsked = 0; }
   const slowFor = n.slowSince ? (Date.now() - n.slowSince) / 1000 : 0, crawling = slowFor > 25;
   if (crawling && !n.crawling) { speak(`Ralentissement détecté.`); navigator.vibrate?.(120); }
@@ -1011,12 +1013,13 @@ function navUpdate() {
   if (crawling && slowFor > 75 && !n.crawlAsked) { n.crawlAsked = 1; n.lastCheck = 0; speak('Bouchon détecté. Je cherche un itinéraire plus rapide.');
     if (p) { const cells = r.coords.slice(n.idx, n.idx + 20); for (let i = 0; i < cells.length; i += 2) for (let k = 0; k < 3; k++) learn(cells[i], 4, Date.now()); } } // la route bouchée est pénalisée au recalcul
   $('#nWarn').hidden = true;
+  if (!n.logT || Date.now() - n.logT > 10000) { n.logT = Date.now(); navLog('s', { d: Math.round(done), v: Math.round(S.speed), pk: pk != null ? Math.round(pk) : null, fk: Math.round(n.freeK || 0), lvl, m: msg.slice(0, 60), left: Math.round(leftT), p: p.map(x => +x.toFixed(5)) }); }
   refreshCompass(); syncSheet();
   if (left < 40 || hav(p, [S.B.lat, S.B.lng]) < 35) { stopNav(true); return; }
   const segB = r.coords[best + 1] ? bearingOf(r.coords[best], r.coords[best + 1]) : null;
   const wrongWay = fresh && segB != null && S.speed > 12 && S.heading != null && Math.abs(angDiff(S.heading, segB)) > 75 && bd > 15;
   if (fresh) { if (bd > 120) n.off += 2; else if (bd > 40 || wrongWay) n.off++; else n.off = 0; }
-  if (n.off >= 2 && S.set.reroute && Date.now() - (n.rerouteAt || 0) > 8000) { n.off = 0; n.rerouteAt = Date.now(); speak('Nouvel itinéraire.'); const stat2 = $('#nStatus'); stat2.className = 'nstatus slow'; stat2.lastChild.textContent = 'Recalcul de l’itinéraire…'; reroute(); }
+  if (n.off >= 2 && S.set.reroute && Date.now() - (n.rerouteAt || 0) > 8000) { navLog('reroute', { bd: Math.round(bd), wrongWay }); n.off = 0; n.rerouteAt = Date.now(); speak('Nouvel itinéraire.'); const stat2 = $('#nStatus'); stat2.className = 'nstatus slow'; stat2.lastChild.textContent = 'Recalcul de l’itinéraire…'; reroute(); }
   if (crawling && slowFor > 45 && !n.crawlFind) { n.crawlFind = 1; findBetter('au pas'); }
   if (!crawling) n.crawlFind = 0;
   if (Date.now() - n.lastCheck > (crawling ? 40000 : 60000)) { n.lastCheck = Date.now(); betterRoute(leftT); }
@@ -1129,10 +1132,13 @@ function settingsHtml() {
   <label class="set"><span>Marge de sécurité : <b class="num" id="sBufV">${s.buffer}</b> min</span><input type="range" id="sBuf" min="0" max="45" step="5" value="${s.buffer}" style="width:100%;accent-color:var(--signal)"></label>
   ${[['track', 'Suivi et mémorisation des lieux', 'Apprend vos lieux fréquents et les rues où vous roulez au pas.'], ['autoSat', 'Vue satellite automatique', 'S’ouvre dès qu’un bouchon est trouvé sur le trajet ou à destination.'], ['voice', 'Guidage vocal', ''], ['reroute', 'Recalcul automatique', 'Hors itinéraire ou si une route plus rapide apparaît (≥ 3 min gagnées).'], ['tolls', 'Éviter les péages', 'Ex. autoroute du Nord, pont HKB (avec clé TomTom).'], ['highways', 'Éviter les autoroutes', '']]
       .map(([k, t, d]) => `<label class="toggle"><span><b>${t}</b>${d ? `<br><small style="color:var(--muted)">${d}</small>` : ''}</span><input type="checkbox" data-set="${k}" ${s[k] ? 'checked' : ''}></label>`).join('')}
+  <h3>Journal de guidage</h3>
+  <p class="empty" style="font-size:12px">Les ${(store.get('navlogs', [])).length} derniers trajets guidés (vitesse, alertes, recalculs). Copiez-le et collez-le dans la conversation avec Claude pour faire corriger l’appli sur vos vrais trajets.</p>
+  <div class="btns"><button class="btn" id="sCopyLog">${ic('share')}Copier le journal</button></div>
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 24 · bouchons détectés à votre vitesse</p>
+  <p class="empty" style="font-size:12px">Version 25 · robot de maintenance</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1160,6 +1166,7 @@ function bindPane() {
   pane.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { S.places = S.places.filter(x => x.id !== b.dataset.pdel); savePlaces(); renderPlaces(); render(); });
   pane.querySelectorAll('[data-set]').forEach(c => c.onchange = () => { S.set[c.dataset.set] = c.checked; saveSet(); });
   $('#sSaveAI') && ($('#sSaveAI').onclick = () => { S.set.aiKey = $('#sAIKey').value.trim(); saveSet(); aiClient = null; toast(S.set.aiKey ? 'Clé Claude enregistrée : Ponctuel IA passe en mode avancé.' : 'Clé Claude retirée : mode local.', 3500, 'sparkle'); });
+  $('#sCopyLog') && ($('#sCopyLog').onclick = async () => { const t = JSON.stringify({ app: 'Ponctuel', v: (document.querySelector('script[src^="app.js"]')?.src.split('v=')[1]) || '', trips: store.get('navlogs', []) }); try { await navigator.clipboard.writeText(t); toast(`Journal copié (${Math.round(t.length / 1024)} Ko) : collez-le à Claude.`, 4000, 'check'); } catch { toast('Copie impossible sur cet appareil.', 3000); } });
   const buf = $('#sBuf'); if (buf) buf.oninput = () => { S.set.buffer = +buf.value; $('#sBufV').textContent = buf.value; saveSet(); };
   $('#sSaveKey') && ($('#sSaveKey').onclick = async () => {
     S.set.key = $('#sKey').value.trim(); saveSet();
@@ -1881,7 +1888,7 @@ async function findBetter(reason, curLeftArg) {
   } finally { finding = false; }
 }
 function offerRoute(route, gain, why, cands) {
-  const n = S.nav; if (!n) return;
+  const n = S.nav; if (!n) return; navLog('offer', { gain: Math.round(gain), why, dist: Math.round(route.dist) });
   n.offer = route; setData('offer', lineFC(route.coords));
   const box = $('#nOffer'); box.hidden = false;
   box.querySelector('b').textContent = `Itinéraire plus rapide · −${fmtDur(gain)}`;
@@ -1892,14 +1899,25 @@ function offerRoute(route, gain, why, cands) {
   n._offerCands = cands;
 }
 function takeOffer() {
-  clearInterval(offerT); const n = S.nav; $('#nOffer').hidden = true; setData('offer', EMPTY); if (!n?.offer) return;
+  clearInterval(offerT); const n = S.nav; navLog('take'); $('#nOffer').hidden = true; setData('offer', EMPTY); if (!n?.offer) return;
   const r = n.offer; n.offer = null;
   S.routes = [r, ...(n._offerCands || []).filter(x => x !== r)].slice(0, 3); S.sel = 0;
   n.r = r; n.idx = 0; n.spoken = {}; n.live = null; n.done = 0; n.trace = []; n.probes = []; n.probeAt = 0; n.slowSince = 0; n.crawlAsked = 0;
   drawRoutes(true); speak('Nouvel itinéraire.'); toast('Nouvel itinéraire plus rapide', 2500, 'route');
 }
-function dropOffer() { clearInterval(offerT); if (S.nav) { S.nav.offer = null; S.nav.findAt = Date.now() + 60000; } $('#nOffer').hidden = true; setData('offer', EMPTY); }
+function dropOffer() { navLog('skip'); clearInterval(offerT); if (S.nav) { S.nav.offer = null; S.nav.findAt = Date.now() + 60000; } $('#nOffer').hidden = true; setData('offer', EMPTY); }
 $('#ofTake').onclick = takeOffer; $('#ofSkip').onclick = dropOffer;
 // un nouveau bouchon repéré devant déclenche aussitôt la recherche
 const _probe0 = probeAhead;
 probeAhead = async function () { const n = S.nav, before = (n?.probes || []).filter(q => q.ratio < .6).length; await _probe0(); if (S.nav === n && n && (n.probes || []).filter(q => q.ratio < .6).length > before) findBetter('bouchon devant'); };
+
+/* ================= Journal de guidage (pour corriger l'appli à partir de vrais trajets) ================= */
+function navLog(type, data = {}) { const n = S.nav; if (!n) return; (n.log ||= []).push({ t: Math.round((Date.now() - n.start) / 1000), type, ...data }); if (n.log.length > 800) n.log.splice(0, n.log.length - 800); }
+function saveNavLog(n, arrived) {
+  try {
+    const logs = store.get('navlogs', []);
+    logs.unshift({ at: new Date(n.start).toISOString(), to: S.B?.name || '', arrived, predMin: Math.round((n.pred || 0) / 60), realMin: Math.round((Date.now() - n.start) / 60000),
+      distKm: +((n.r?.dist || 0) / 1000).toFixed(1), tomtom: !!S.set.key, log: n.log || [] });
+    store.set('navlogs', logs.slice(0, 8));
+  } catch (e) { console.warn('journal', e); }
+}

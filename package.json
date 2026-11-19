@@ -1,0 +1,11 @@
+{
+  "name": "ponctuel",
+  "private": true,
+  "description": "Ponctuel – navigation anti-retard (Abidjan)",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

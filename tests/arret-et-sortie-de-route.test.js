@@ -1,0 +1,20 @@
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch({args:['--use-gl=swiftshader','--ignore-gpu-blocklist']});
+const ctx=await b.newContext({viewport:{width:400,height:820},geolocation:{latitude:5.3480,longitude:-4.0040},permissions:['geolocation']});
+const p=await ctx.newPage();const e=[];p.on('pageerror',x=>e.push(x.message));
+await p.addInitScript(()=>localStorage.setItem('pc_settings',JSON.stringify({key:'DEMO',v3d:2,voice:false})));
+await p.route(/openfreemap|orbis|fonts|arcgis|traffic\/map|flowSegment|media\/|elevation/,r=>r.fulfill({status:404,body:''}));
+let calls=0;await p.route(/calculateRoute/,r=>{calls++;const u=r.request().url();const from=u.match(/calculateRoute\/([\d.\-]+),([\d.\-]+):/);const la=+from[1],lo=+from[2];
+ const pts=[];for(let i=0;i<=40;i++)pts.push({latitude:la+(5.3215-la)*i/40,longitude:lo+(-4.017-lo)*i/40});
+ r.fulfill({json:{routes:[{summary:{lengthInMeters:4000,travelTimeInSeconds:900,trafficDelayInSeconds:0,noTrafficTravelTimeInSeconds:900},legs:[{points:pts}],sections:[],guidance:{instructions:[]}}]}});});
+await p.goto('http://localhost:8765/');await p.waitForTimeout(2500);await p.click('#skipSplash').catch(()=>{});
+await p.evaluate(async()=>{setB({lat:5.3215,lng:-4.017,name:'BHCI'});await calc();});await p.waitForTimeout(800);
+await p.evaluate(()=>{$('#sat').hidden=true;startNav();});await p.waitForTimeout(800);
+for(const f of [0.05,0.1,0.15]){await ctx.setGeolocation({latitude:5.348+(5.3215-5.348)*f,longitude:-4.004+(-4.017+4.004)*f});await p.waitForTimeout(1200);}
+await p.evaluate(()=>{S.nav.movedAt=Date.now()-60000; S.nav.slowSince=Date.now()-100000; S.posT=Date.now()-10000;});
+await p.waitForTimeout(3500);
+console.log('statut à l\'arrêt :', await p.textContent('#nStatus'), '| classe :', await p.getAttribute('#nStatus','class'));
+console.log('recherche d\'un meilleur itinéraire :', await p.evaluate(()=>S.nav.crawlAsked===1));
+const c0=calls; await ctx.setGeolocation({latitude:5.3445,longitude:-4.0105}); await p.waitForTimeout(1300); await ctx.setGeolocation({latitude:5.3440,longitude:-4.0110}); await p.waitForTimeout(2500);
+console.log('recalcul après sortie de route :', calls>c0, '| départ du nouvel itinéraire :', await p.evaluate(()=>S.nav.r.coords[0].map(v=>v.toFixed(4)).join(',')));
+console.log('errors:',e.join('|')||'none');await b.close();})();
