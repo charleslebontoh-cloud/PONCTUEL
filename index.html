@@ -465,6 +465,17 @@ body.navmode #recenter{bottom:calc(env(safe-area-inset-bottom,0px) + 98px)!impor
 body.navmode .maplibregl-ctrl-bottom-right,body.navmode .maplibregl-ctrl-bottom-left{display:none}
 #nav .instr{border-radius:22px}
 
+
+.nstatus{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px 12px;border-radius:16px;font:700 13.5px var(--body);color:#fff;background:linear-gradient(135deg,#119a5c,#2fd27a);box-shadow:0 6px 16px rgba(0,0,0,.25);transition:background .4s}
+.nstatus .ic{width:18px;height:18px;flex:none;stroke-width:2.4}
+.nstatus span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nstatus.slow{background:linear-gradient(135deg,#e07a00,#ff9a2e);color:#1f1100}
+.nstatus.jam{background:linear-gradient(135deg,#c81e2c,#ff4b4b);animation:beat 1.6s ease-in-out infinite}
+#navbar .k div b{font-size:24px}
+#speed{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)}
+body.navmode #fab{bottom:calc(env(safe-area-inset-bottom,0px) + 150px)!important}
+body.navmode #recenter{bottom:calc(env(safe-area-inset-bottom,0px) + 146px)!important}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:900px){#lstack{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:20px} #sheet{left:12px;right:auto;width:470px;bottom:12px;border-radius:20px;border-bottom:1px solid var(--line);max-height:calc(100vh - 230px)} #top{width:470px}}
 </style>
@@ -540,6 +551,7 @@ body.navmode .maplibregl-ctrl-bottom-right,body.navmode .maplibregl-ctrl-bottom-
 </div>
 <div id="speed" class="glass" hidden><svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="33" fill="none" stroke="var(--line)" stroke-width="4" stroke-dasharray="155 300" stroke-linecap="round"/><circle id="spdArc" cx="37" cy="37" r="33" fill="none" stroke="var(--go)" stroke-width="4" stroke-dasharray="0 300" stroke-linecap="round" style="transition:stroke-dasharray .6s,stroke .3s"/></svg><div><b id="spd">0</b><small>km/h</small></div></div>
 <div id="navbar" class="glass" hidden>
+  <div class="nstatus ok" id="nStatus"></div>
   <div class="row">
     <button class="nb" id="nStop" aria-label="Arrêter le guidage"><span data-ic="x"></span></button>
     <div class="k">
@@ -596,6 +608,6 @@ body.navmode .maplibregl-ctrl-bottom-right,body.navmode .maplibregl-ctrl-bottom-
 </section>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

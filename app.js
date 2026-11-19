@@ -919,10 +919,22 @@ function navUpdate() {
     if (d < 450 && d > 150 && !n.spoken[st.off + 'f']) { n.spoken[st.off + 'f'] = 1; speak(`Dans ${Math.round(d / 50) * 50} mètres, ${lc(st.text)}`); }
     if (d <= 70 && !n.spoken[st.off + 'n']) { n.spoken[st.off + 'n'] = 1; speak(st.text); navigator.vibrate?.(60); }
   }
-  const ahead = r.jams.find(j => j.startOff > done && j.startOff - done < 1500 && (j.mag >= 2 || j.delay > 60)), w = $('#nWarn');
-  if (ahead) { w.hidden = false; w.textContent = `Bouchon dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`;
-    if (!n.spoken['j' + ahead.startOff]) { n.spoken['j' + ahead.startOff] = 1; speak(`Attention, ralentissement dans ${fmtKm(ahead.startOff - done)}.`); } }
-  else w.hidden = true;
+  // Alerte lenteur : toujours visible au-dessus de la barre (fluide / ralentissement devant / dans le bouchon / roulez au pas / retard prévu)
+  const inJam = r.jams.find(j => done >= j.startOff - 20 && done <= j.startOff + (j.len || 0) && (j.mag >= 2 || j.delay > 60));
+  const ahead = r.jams.find(j => j.startOff > done && j.startOff - done < 3000 && (j.mag >= 2 || j.delay > 60));
+  if (S.speed < 8) n.slowSince = n.slowSince || Date.now(); else n.slowSince = 0;
+  const crawling = n.slowSince && Date.now() - n.slowSince > 40000;
+  const jamLeft = r.jams.filter(j => j.startOff + (j.len || 0) > done).reduce((t, j) => t + (j.delay || 0), 0);
+  const lateMin = n.planned ? Math.round((eta.getTime() - n.planned) / 60000) : null;
+  let lvl = 'ok', msg = jamLeft > 60 ? `Trafic : +${fmtDur(jamLeft)} sur le reste du trajet` : 'Trafic fluide';
+  if (ahead) { lvl = ahead.mag >= 3 ? 'jam' : 'slow'; msg = `${ahead.mag >= 3 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`; }
+  if (inJam) { lvl = 'jam'; msg = `Dans le bouchon · encore ${fmtKm(Math.max(0, inJam.startOff + (inJam.len || 0) - done))}${inJam.delay ? ' · +' + fmtDur(inJam.delay) : ''}`; }
+  else if (crawling) { lvl = 'slow'; msg = `Vous roulez au pas depuis ${Math.round((Date.now() - n.slowSince) / 60000) || 1} min`; }
+  if (lateMin > 0) msg += ` · retard prévu +${lateMin} min`;
+  const stat = $('#nStatus'); stat.className = 'nstatus ' + lvl; stat.innerHTML = ic(lvl === 'ok' ? 'check' : lvl === 'jam' ? 'alert' : 'jam') + '<span></span>'; stat.lastChild.textContent = msg;
+  if (ahead && !n.spoken['j' + ahead.startOff] && ahead.startOff - done < 1500) { n.spoken['j' + ahead.startOff] = 1; speak(`Attention, ${ahead.mag >= 3 ? 'bouchon' : 'ralentissement'} dans ${fmtKm(ahead.startOff - done)}.`); }
+  if (crawling && !n.spoken.crawl) { n.spoken.crawl = 1; if (S.set.key) { n.lastCheck = 0; } }
+  $('#nWarn').hidden = true;
   refreshCompass(); syncSheet();
   if (left < 40 || hav(p, [S.B.lat, S.B.lng]) < 35) { stopNav(true); return; }
   if (bd > 70) { if (++n.off >= 3 && S.set.reroute) { n.off = -10; speak('Recalcul de l’itinéraire.'); reroute(); } } else n.off = 0;
@@ -1043,7 +1055,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 17 · guidage plein écran</p>
+  <p class="empty" style="font-size:12px">Version 18 · alerte lenteur</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
