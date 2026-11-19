@@ -440,7 +440,7 @@ function onFix(p) {
   if (spd != null && spd > 220) spd = null;
   if (c.heading != null && !isNaN(c.heading) && (spd ?? 0) > 3) S.heading = c.heading;
   else if (lastFix && hav(lastFix.p, here) > 8 && (spd ?? 0) > 4) S.heading = bearingOf(lastFix.p, here);
-  S.speed = spd ?? S.speed ?? 0;
+  S.speed = spd ?? S.speed ?? 0; S.posT = Date.now();
   const prev = anim.cur || S.pos;
   S.pos = here;
   if (c.accuracy < 60 && lastFix && now - lastFix.t >= 4000) { learn(here, S.speed, now); lastFix = { p: here, t: now }; }
@@ -956,28 +956,36 @@ function navUpdate() {
   // Alerte lenteur : toujours visible au-dessus de la barre (fluide / ralentissement devant / dans le bouchon / roulez au pas / retard prévu)
   const inJam = r.jams.find(j => done >= j.startOff - 20 && done <= j.startOff + (j.len || 0) && (j.mag >= 2 || j.delay > 60));
   const ahead = r.jams.find(j => j.startOff > done && j.startOff - done < 3000 && (j.mag >= 2 || j.delay > 60));
-  if (S.speed < 8) n.slowSince = n.slowSince || Date.now(); else n.slowSince = 0;
-  const crawling = n.slowSince && Date.now() - n.slowSince > 40000;
+  const fresh = S.posT !== n.seenFix; n.seenFix = S.posT;
+  if (Date.now() - (S.posT || 0) > 6000) S.speed = 0; // plus de point GPS : arrêté
+  // allure réelle sur 90 s (plus fiable que la vitesse instantanée en bouchon : avance-arrêt)
+  const t90 = (n.trace || []).filter(x => Date.now() - x.t < 90000), pace90 = t90.length > 1 && t90[t90.length - 1].t - t90[0].t > 45000 ? (t90[t90.length - 1].d - t90[0].d) / ((t90[t90.length - 1].t - t90[0].t) / 1000) * 3.6 : null;
+  const slowNow = S.speed < 10 || (pace90 != null && pace90 < 12);
+  if (slowNow && n.movedAt) n.slowSince = n.slowSince || Date.now(); else if (!slowNow) { n.slowSince = 0; n.crawlAsked = 0; }
+  const slowFor = n.slowSince ? (Date.now() - n.slowSince) / 1000 : 0, crawling = slowFor > 30;
   const jamLeft = r.jams.filter(j => j.startOff + (j.len || 0) > done).reduce((t, j) => t + (j.delay || 0), 0);
   const lateMin = n.planned ? Math.round((eta.getTime() - n.planned) / 60000) : null;
   let lvl = 'ok', msg = jamLeft > 60 ? `Trafic : +${fmtDur(jamLeft)} sur le reste du trajet` : 'Trafic fluide';
   if (ahead) { lvl = ahead.mag >= 3 ? 'jam' : 'slow'; msg = `${ahead.mag >= 3 ? 'Bouchon' : 'Ralentissement'} dans ${fmtKm(ahead.startOff - done)}${ahead.delay ? ' · +' + fmtDur(ahead.delay) : ''}${ahead.speed ? ' · ' + Math.round(ahead.speed) + ' km/h' : ''}`; }
   if (inJam) { lvl = 'jam'; msg = `Dans le bouchon · encore ${fmtKm(Math.max(0, inJam.startOff + (inJam.len || 0) - done))}${inJam.delay ? ' · +' + fmtDur(inJam.delay) : ''}`; }
-  else if (crawling) { lvl = 'slow'; msg = `Vous roulez au pas depuis ${Math.round((Date.now() - n.slowSince) / 60000) || 1} min`; }
+  else if (crawling) { lvl = slowFor > 120 ? 'jam' : 'slow'; msg = slowFor > 120 ? `Bouchon détecté · arrêt depuis ${Math.round(slowFor / 60)} min${pace90 != null ? ' · ' + Math.round(pace90) + ' km/h' : ''}` : `Ralentissement · vous roulez au pas`; }
   if (lateMin > 0) msg += ` · retard prévu +${lateMin} min`;
   const stat = $('#nStatus'); stat.className = 'nstatus ' + lvl; stat.innerHTML = ic(lvl === 'ok' ? 'check' : lvl === 'jam' ? 'alert' : 'jam') + '<span></span>'; stat.lastChild.textContent = msg;
   if (ahead && !n.spoken['j' + ahead.startOff] && ahead.startOff - done < 1500) { n.spoken['j' + ahead.startOff] = 1; speak(`Attention, ${ahead.mag >= 3 ? 'bouchon' : 'ralentissement'} dans ${fmtKm(ahead.startOff - done)}.`); }
-  if (crawling && !n.spoken.crawl) { n.spoken.crawl = 1; if (S.set.key) { n.lastCheck = 0; } }
+  // bouchon constaté sur place : on le note, on prévient et on cherche aussitôt un meilleur itinéraire
+  if (crawling && slowFor > 75 && !n.crawlAsked) { n.crawlAsked = 1; n.lastCheck = 0; speak('Bouchon détecté. Je cherche un itinéraire plus rapide.');
+    if (p) { const cells = r.coords.slice(n.idx, n.idx + 20); for (let i = 0; i < cells.length; i += 2) for (let k = 0; k < 3; k++) learn(cells[i], 4, Date.now()); } } // la route bouchée est pénalisée au recalcul
   $('#nWarn').hidden = true;
   refreshCompass(); syncSheet();
   if (left < 40 || hav(p, [S.B.lat, S.B.lng]) < 35) { stopNav(true); return; }
-  if (bd > 70) { if (++n.off >= 3 && S.set.reroute) { n.off = -10; speak('Recalcul de l’itinéraire.'); reroute(); } } else n.off = 0;
-  if (S.set.key && Date.now() - n.lastCheck > 120000) { n.lastCheck = Date.now(); betterRoute(leftT); }
+  if (fresh) { if (bd > 120) n.off += 2; else if (bd > 40) n.off++; else n.off = 0; }
+  if (n.off >= 2 && S.set.reroute && Date.now() - (n.rerouteAt || 0) > 8000) { n.off = 0; n.rerouteAt = Date.now(); speak('Nouvel itinéraire.'); const stat2 = $('#nStatus'); stat2.className = 'nstatus slow'; stat2.lastChild.textContent = 'Recalcul de l’itinéraire…'; reroute(); }
+  if (Date.now() - n.lastCheck > (crawling ? 45000 : 120000)) { n.lastCheck = Date.now(); betterRoute(leftT); }
 }
 const lc = s => s.charAt(0).toLowerCase() + s.slice(1);
 async function reroute() {
   const rs = await calc({ silent: true, from: { lat: S.pos[0], lng: S.pos[1] } });
-  if (rs?.length && S.nav) { S.routes = rs; S.sel = 0; S.nav.r = rs[0]; S.nav.idx = 0; S.nav.spoken = {}; drawRoutes(false); }
+  if (rs?.length && S.nav) { S.routes = rs; S.sel = 0; S.nav.r = rs[0]; S.nav.idx = 0; S.nav.spoken = {}; S.nav.live = null; S.nav.done = 0; S.nav.trace = []; drawRoutes(false); toast(`Nouvel itinéraire : ${fmtDur(rs[0].dur)}`, 3000, 'route'); }
 }
 async function betterRoute(curLeft) {
   const rs = await calc({ silent: true, from: { lat: S.pos[0], lng: S.pos[1] } });
@@ -1091,7 +1099,7 @@ function settingsHtml() {
   <h3>Vos données</h3>
   <div class="btns"><button class="btn" id="sExport">Exporter (sauvegarde)</button><label class="btn" style="cursor:pointer">Importer<input type="file" id="sImport" accept="application/json" hidden></label><button class="btn danger" id="sWipe">Tout effacer</button></div>
   <div id="wipeConfirm" hidden class="note"><b>Effacer lieux, trajets et vitesses apprises ?</b> <button class="btn danger" id="sWipeYes">Oui, effacer</button></div>
-  <p class="empty" style="font-size:12px">Version 20 · estimation intelligente</p>
+  <p class="empty" style="font-size:12px">Version 21 · bouchons détectés sur place</p>
   <h3>Ce que fait vraiment chaque source</h3>
   <div class="note"><b>Trafic</b> : TomTom mesure la vitesse réelle des véhicules, mise à jour chaque minute. <b>Satellite</b> : image haute résolution Esri/Maxar, prise il y a quelques mois ; aucun satellite public ne filme la route en direct, le trafic est donc dessiné par-dessus. <b>NASA</b> : GIBS fournit l’image MODIS de la veille (250 m/pixel), utile pour la météo. <b>Carte</b> : OpenFreeMap / OpenStreetMap. <b>Vos données</b> restent dans ce navigateur.</div>`;
 }
@@ -1772,3 +1780,6 @@ function learnEta(n) {
 }
 // Une heure d'arrivée oubliée (déjà passée depuis plus de 30 min) ne doit pas fausser le « retard prévu »
 (() => { const t = targetDate(), setAt = store.get('arriveSetAt', 0); if (t && (t.getTime() < Date.now() - 20 * 60000 || Date.now() - setAt > 14 * 3600e3)) { arriveIn.value = ''; store.set('arrive', ''); } })();
+
+// L'iPhone n'envoie plus de position quand la voiture est arrêtée : on rafraîchit le guidage toutes les 3 s quand même
+setInterval(() => { if (S.nav && S.pos) navUpdate(); }, 3000);
